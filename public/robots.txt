@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Allow: /privacy
+
+Disallow: /dashboard
+Disallow: /tasks
+Disallow: /vision
+Disallow: /planner
+Disallow: /projects
+Disallow: /team
+Disallow: /settings
+Disallow: /api/
+
+Sitemap: https://myreality.app/sitemap.xml

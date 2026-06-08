@@ -43,9 +43,7 @@ export default function SignupForm() {
       toast.error('Sign up failed', { description: error.message })
       return
     }
-    toast.success('Account created!', { description: 'Setting up your workspace...' })
-    router.push('/dashboard')
-    router.refresh()
+    router.push('/auth/check-email')
   }
 
   async function handleGoogleOAuth() {

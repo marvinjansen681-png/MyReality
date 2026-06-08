@@ -5,8 +5,8 @@ const config: CapacitorConfig = {
   appName: 'MyReality',
   webDir: 'out',
   server: {
-    url: process.env.NEXT_PUBLIC_APP_URL,
-    cleartext: false,
+    url: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3002',
+    cleartext: true,
   },
   plugins: {
     SplashScreen: {
