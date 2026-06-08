@@ -7,9 +7,9 @@
 ## ▶️ CURRENT STATUS
 
 ```
-NEXT STEP TO BUILD:  Step 2 — TypeScript Types
-OVERALL PROGRESS:    1 of 20 steps complete
-LAST COMMIT:         step-1: project initialisation — tested ✓
+NEXT STEP TO BUILD:  Step 3 — Supabase Setup
+OVERALL PROGRESS:    2 of 20 steps complete
+LAST COMMIT:         step-2: typescript types — tested ✓
 APP STATUS:          running on localhost:3001
 ```
 
@@ -20,7 +20,7 @@ APP STATUS:          running on localhost:3001
 | # | Step | Status | Commit | Notes |
 |---|---|---|---|---|
 | 1 | Project Initialisation | ✅ Complete | step-1 | Next.js 14 + all packages + folder structure + design tokens |
-| 2 | TypeScript Types | ⬜ Not started | — | — |
+| 2 | TypeScript Types | ✅ Complete | step-2 | All types from Section 8 — zero TS errors |
 | 3 | Supabase Setup | ⬜ Not started | — | — |
 | 4 | Auth + Workspace Creation | ⬜ Not started | — | — |
 | 5 | App Shell (Sidebar + Header) | ⬜ Not started | — | — |
@@ -70,11 +70,14 @@ Notes:
 
 ### Step 2 — TypeScript Types
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Started:    2026-06-08
+Completed:  2026-06-08
+Commit:     step-2
+Notes:
+  - All types from Section 8 written to /types/index.ts
+  - 10 union types, 12 interfaces, fully strict — no any, no inline types
+  - npx tsc --noEmit: ZERO errors
 ```
 
 ### Step 3 — Supabase Setup
@@ -287,6 +290,7 @@ Mobile tested: —
 | Date | Steps worked on | Outcome |
 |---|---|---|
 | 2026-06-08 | Step 1 | Complete — Next.js + all packages + folder structure + design tokens |
+| 2026-06-08 | Step 2 | Complete — all TypeScript types written, zero errors |
 
 ---
 
