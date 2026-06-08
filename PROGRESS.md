@@ -7,9 +7,9 @@
 ## ▶️ CURRENT STATUS
 
 ```
-NEXT STEP TO BUILD:  Step 5 — App Shell (Sidebar + Header)
-OVERALL PROGRESS:    4 of 20 steps complete
-LAST COMMIT:         step-4: auth + workspace creation — tested ✓
+NEXT STEP TO BUILD:  Step 6 — Dashboard
+OVERALL PROGRESS:    5 of 20 steps complete
+LAST COMMIT:         step-5: app shell sidebar + header — tested ✓
 APP STATUS:          running on localhost:3001
 ```
 
@@ -23,7 +23,7 @@ APP STATUS:          running on localhost:3001
 | 2 | TypeScript Types | ✅ Complete | step-2 | All types from Section 8 — zero TS errors |
 | 3 | Supabase Setup | ✅ Complete | step-3 | All 11 tables + RLS + visions bucket verified OK |
 | 4 | Auth + Workspace Creation | ✅ Complete | step-4 | Login, signup, Google OAuth, workspace modal, middleware |
-| 5 | App Shell (Sidebar + Header) | ⬜ Not started | — | — |
+| 5 | App Shell (Sidebar + Header) | ✅ Complete | step-5 | Sidebar + Header + Zustand stores, mobile drawer, collapse |
 | 6 | Dashboard | ⬜ Not started | — | — |
 | 7 | Vision Board | ⬜ Not started | — | — |
 | 8 | Weekly Planner | ⬜ Not started | — | — |
@@ -125,11 +125,25 @@ Notes:
 
 ### Step 5 — App Shell
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Started:    2026-06-08
+Completed:  2026-06-08
+Commit:     step-5
+Notes:
+  - uiStore: sidebarCollapsed (persisted to localStorage), sidebarMobileOpen, activeModal
+  - workspaceStore: activeWorkspace (persisted)
+  - Sidebar: desktop sticky with Framer Motion width animation (240px ↔ 64px)
+    - Mobile: overlay drawer from left, backdrop, closes on nav click
+    - Active route: gold left border + bg-hover
+    - Collapsed: icon-only with tooltip on hover
+    - Workspace name in header, logout button at bottom
+  - Header: 56px sticky, safe-top for PWA notch support
+    - Mobile: hamburger + centred logo + bell + avatar
+    - Desktop: page title + search + bell + avatar dropdown
+    - Avatar dropdown: profile name/email, settings, logout
+    - Bell badge: shows unread notification count
+  - AppLayout: server-side data fetch (profile + workspace), passes to components
+  - All 7 routes return 200, zero TS errors
 ```
 
 ### Step 6 — Dashboard
