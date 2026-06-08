@@ -7,10 +7,10 @@
 ## ▶️ CURRENT STATUS
 
 ```
-NEXT STEP TO BUILD:  Step 6 — Dashboard
-OVERALL PROGRESS:    5 of 20 steps complete
-LAST COMMIT:         step-5: app shell sidebar + header — tested ✓
-APP STATUS:          running on localhost:3001
+NEXT STEP TO BUILD:  Step 16 — Landing Page
+OVERALL PROGRESS:    15 of 20 steps complete
+LAST COMMIT:         step-15: settings page — profile, workspace, notification preferences
+APP STATUS:          running on localhost:3002
 ```
 
 ---
@@ -24,16 +24,16 @@ APP STATUS:          running on localhost:3001
 | 3 | Supabase Setup | ✅ Complete | step-3 | All 11 tables + RLS + visions bucket verified OK |
 | 4 | Auth + Workspace Creation | ✅ Complete | step-4 | Login, signup, Google OAuth, workspace modal, middleware |
 | 5 | App Shell (Sidebar + Header) | ✅ Complete | step-5 | Sidebar + Header + Zustand stores, mobile drawer, collapse |
-| 6 | Dashboard | ⬜ Not started | — | — |
-| 7 | Vision Board | ⬜ Not started | — | — |
-| 8 | Weekly Planner | ⬜ Not started | — | — |
-| 9 | Personal Task Tracker | ⬜ Not started | — | — |
-| 10 | Projects (Board + List + TaskDetail) | ⬜ Not started | — | — |
-| 11 | Realtime Collaboration | ⬜ Not started | — | — |
-| 12 | Notifications | ⬜ Not started | — | — |
-| 13 | Team Management | ⬜ Not started | — | — |
-| 14 | Command Palette (Cmd+K) | ⬜ Not started | — | — |
-| 15 | Settings | ⬜ Not started | — | — |
+| 6 | Dashboard | ✅ Complete | step-6 | 5 widgets, parallel Supabase queries, mobile grid |
+| 7 | Vision Board | ✅ Complete | step-7 | DnD reorder, image upload, confetti, category filter |
+| 8 | Weekly Planner | ✅ Complete | step-8 | Cross-day DnD, week nav, intention field, mobile tabs |
+| 9 | Personal Task Tracker | ✅ Complete | step-9 | TipTap drawer, subtasks, bulk actions, filter/sort |
+| 10 | Projects (Board + List + TaskDetail) | ✅ Complete | step-10 | Kanban DnD, list view, comments, activity log |
+| 11 | Realtime Collaboration | ✅ Complete | step-11 | useRealtime hook, live board updates via postgres_changes |
+| 12 | Notifications | ✅ Complete | step-12 | Bell dropdown, realtime INSERT, mark read/all |
+| 13 | Team Management | ✅ Complete | step-13 | Invite, role change, remove member, email scaffolding |
+| 14 | Command Palette (Cmd+K) | ✅ Complete | step-14 | Search, keyboard nav, recent items, Cmd+K shortcut |
+| 15 | Settings | ✅ Complete | step-15 | Profile + avatar, workspace + logo, notif prefs toggles |
 | 16 | Landing Page | ⬜ Not started | — | — |
 | 17 | PWA Setup | ⬜ Not started | — | — |
 | 18 | Capacitor Android Setup | ⬜ Not started | — | — |
@@ -148,92 +148,86 @@ Notes:
 
 ### Step 6 — Dashboard
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Commit:     step-6
+Notes:      ProgressRing, TodayTasks, UpcomingDeadlines, ActivityFeed, VisionHighlight
+            Mobile single-col / desktop 3-col grid, time-aware greeting
 ```
 
 ### Step 7 — Vision Board
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Commit:     step-7
+Notes:      DnD reorder via @dnd-kit, category filter tabs, image upload to Supabase Storage
+            VisionCard context menu (edit/achieve/pause/delete), react-confetti on achieve
 ```
 
 ### Step 8 — Weekly Planner
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Commit:     step-8
+Notes:      Cross-day DnD, week navigation, debounced upsert, mobile day picker tabs
+            Weekly intention stored at day_index=7, inline text edit on items
 ```
 
 ### Step 9 — Personal Task Tracker
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Commit:     step-9
+Notes:      TipTap rich text in TaskDrawer, SubtaskList CRUD, filter tabs with counts
+            300ms debounced search, sort options, bulk select pill bar
 ```
 
 ### Step 10 — Projects
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Commit:     step-10
+Notes:      Kanban board with cross-column DnD, list view, TaskDetail drawer
+            Comments thread, activity log, TipTap description, auto-save 500ms
 ```
 
 ### Step 11 — Realtime Collaboration
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Commit:     step-11
+Notes:      useRealtime hook subscribes to workspace:{id}:tasks channel
+            BoardView wired: INSERT/UPDATE/DELETE update local state + toast on other-user events
 ```
 
 ### Step 12 — Notifications
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Commit:     step-12
+Notes:      useNotifications hook: realtime INSERT on notifications:{userId} channel
+            Header bell dropdown: type icons, unread gold highlight, mark-all-read
 ```
 
 ### Step 13 — Team Management
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Commit:     step-13
+Notes:      Member list with role badges, invite modal (email+role), change role menu
+            Remove member, email scaffolding in lib/email.ts (RESEND_ENABLED=false)
 ```
 
 ### Step 14 — Command Palette
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Commit:     step-14
+Notes:      Cmd+K global shortcut via AppShell, searches tasks/projects/visions (ilike)
+            Arrow-key navigation, recent items in localStorage, lazy-loaded via next/dynamic
 ```
 
 ### Step 15 — Settings
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
+Status:     ✅ Complete
+Completed:  2026-06-08
+Commit:     step-15
+Notes:      Profile section: update full_name, upload avatar → Supabase Storage (avatars bucket)
+            Workspace section: update name, upload logo → workspace-logos bucket (owner only)
+            Notification prefs: 5 toggles saved to profiles.notif_prefs column (auto-save)
+            Danger zone: Delete Account button (contact support flow)
+            Zero TypeScript errors
 ```
 
 ### Step 16 — Landing Page
@@ -329,6 +323,7 @@ Mobile tested: —
 | 2026-06-08 | Step 1 | Complete — Next.js + all packages + folder structure + design tokens |
 | 2026-06-08 | Step 2 | Complete — all TypeScript types written, zero errors |
 | 2026-06-08 | Step 3 | Complete — 11 tables + RLS + storage bucket verified in Supabase |
+| 2026-06-08 | Steps 6–15 | Complete — all core app features built and committed |
 
 ---
 
