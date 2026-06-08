@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { startOfDay, endOfDay, addDays, format } from 'date-fns'
 import TodayTasks from '@/components/dashboard/TodayTasks'
@@ -89,6 +90,8 @@ export default async function DashboardPage() {
     ? visions[Math.floor(Math.random() * visions.length)]
     : null
 
+  const isFirstTime = todayTasks.length === 0 && visions.length === 0 && activity.length === 0
+
   const hour = today.getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
@@ -103,6 +106,32 @@ export default async function DashboardPage() {
           {format(today, 'EEEE, MMMM d')}
         </p>
       </div>
+
+      {/* First-time onboarding banner */}
+      {isFirstTime && (
+        <div className="bg-[var(--gold-muted)] border border-[var(--gold)]/30 rounded-xl p-5">
+          <p className="text-sm font-semibold text-primary mb-1">Welcome to MyReality 🎉</p>
+          <p className="text-xs text-secondary mb-4">
+            Your workspace is ready. Here&apos;s how to get started:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { href: '/vision', label: 'Build your Vision Board', desc: 'Set goals across all areas of life' },
+              { href: '/tasks',  label: 'Add your first task',     desc: 'Capture what you need to do today' },
+              { href: '/projects', label: 'Start a project',       desc: 'Organise work with your team' },
+            ].map(item => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="block bg-card border border-[var(--border)] rounded-lg px-4 py-3 hover:border-gold transition-colors group"
+              >
+                <p className="text-sm font-medium text-primary group-hover:text-gold transition-colors">{item.label} →</p>
+                <p className="text-xs text-muted mt-0.5">{item.desc}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Mobile: single column */}
       <div className="flex flex-col gap-4 lg:hidden">

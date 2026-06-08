@@ -13,6 +13,9 @@ export default function UpcomingDeadlines({ tasks }: UpcomingDeadlinesProps) {
       <div className="flex flex-col items-center justify-center py-6 text-center">
         <Calendar size={28} className="text-muted mb-2" />
         <p className="text-sm text-secondary">No upcoming deadlines</p>
+        <a href="/planner" className="text-xs text-gold hover:text-gold-light transition-colors mt-1.5">
+          Plan your week →
+        </a>
       </div>
     )
   }

@@ -46,7 +46,9 @@ export default function TodayTasks({ initialTasks }: TodayTasksProps) {
       <div className="flex flex-col items-center justify-center py-6 text-center">
         <CheckCircle2 size={28} className="text-muted mb-2" />
         <p className="text-sm text-secondary">No tasks due today</p>
-        <p className="text-xs text-muted mt-1">Enjoy your free time!</p>
+        <a href="/tasks" className="text-xs text-gold hover:text-gold-light transition-colors mt-1.5">
+          Add a task →
+        </a>
       </div>
     )
   }

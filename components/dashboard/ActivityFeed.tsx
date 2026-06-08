@@ -22,6 +22,9 @@ export default function ActivityFeed({ activity }: ActivityFeedProps) {
       <div className="flex flex-col items-center justify-center py-6 text-center">
         <Activity size={28} className="text-muted mb-2" />
         <p className="text-sm text-secondary">No recent activity</p>
+        <a href="/projects" className="text-xs text-gold hover:text-gold-light transition-colors mt-1.5">
+          Start a project →
+        </a>
       </div>
     )
   }
