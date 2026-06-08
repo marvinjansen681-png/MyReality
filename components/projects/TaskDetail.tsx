@@ -9,6 +9,7 @@ import { format, parseISO, formatDistanceToNow } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils/cn'
+import { logActivity, insertNotification } from '@/lib/utils/activity'
 import SubtaskList from '@/components/tasks/SubtaskList'
 import PriorityBadge from '@/components/shared/PriorityBadge'
 import type { Task, TaskComment, TaskActivity, TaskPriority, Profile } from '@/types'
@@ -102,6 +103,22 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
     setSaving(false)
     if (error) { toast.error('Failed to save'); return }
     onUpdated(data as Task)
+
+    // Notify newly assigned users
+    if (overrides.assigned_to) {
+      const prevAssigned = task.assigned_to ?? []
+      const newAssigned = (overrides.assigned_to as string[]) ?? []
+      const added = newAssigned.filter(id => !prevAssigned.includes(id) && id !== userId)
+      for (const assigneeId of added) {
+        await insertNotification({
+          userId: assigneeId,
+          type: 'task_assigned',
+          title: `You were assigned to "${(overrides.title ?? title)}"`,
+          body: `Assigned by ${userProfile?.full_name ?? 'someone'}`,
+          link: task.project_id ? `/projects/${task.project_id}` : undefined,
+        })
+      }
+    }
   }
 
   async function sendComment() {
@@ -118,6 +135,18 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
     setComments(prev => [...prev, data as TaskComment])
     setCommentText('')
     setTimeout(() => commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+
+    // Log activity + notify task creator if different user
+    await logActivity(task.id, userId, 'commented', { preview: commentText.trim().slice(0, 80) })
+    if (task.created_by !== userId) {
+      await insertNotification({
+        userId: task.created_by,
+        type: 'task_commented',
+        title: `New comment on "${task.title}"`,
+        body: `${userProfile?.full_name ?? 'Someone'}: ${commentText.trim().slice(0, 100)}`,
+        link: task.project_id ? `/projects/${task.project_id}` : undefined,
+      })
+    }
   }
 
   function addLabel() {
