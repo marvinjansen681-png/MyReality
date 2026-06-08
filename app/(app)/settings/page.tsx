@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
-import { User, Building2, Bell, Loader2, Check, Upload, AlertTriangle } from 'lucide-react'
+import { User, Building2, Bell, Loader2, Check, Upload, AlertTriangle, KeyRound, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils/cn'
@@ -22,6 +22,15 @@ const workspaceSchema = z.object({
   name: z.string().min(1, 'Workspace name is required').max(80),
 })
 type WorkspaceForm = z.infer<typeof workspaceSchema>
+
+const passwordSchema = z.object({
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string(),
+}).refine(d => d.newPassword === d.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+})
+type PasswordForm = z.infer<typeof passwordSchema>
 
 interface NotifPrefs {
   task_assigned: boolean
@@ -194,6 +203,11 @@ export default function SettingsPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [isOwner, setIsOwner] = useState(false)
 
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [savedPassword, setSavedPassword] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+
   const profileForm = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
     defaultValues: { full_name: '' },
@@ -202,6 +216,11 @@ export default function SettingsPage() {
   const workspaceForm = useForm<WorkspaceForm>({
     resolver: zodResolver(workspaceSchema),
     defaultValues: { name: '' },
+  })
+
+  const passwordForm = useForm<PasswordForm>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: { newPassword: '', confirmPassword: '' },
   })
 
   useEffect(() => { load() }, [])
@@ -264,6 +283,18 @@ export default function SettingsPage() {
     toast.success('Workspace updated')
     setSavedWorkspace(true)
     setTimeout(() => setSavedWorkspace(false), 2000)
+  }
+
+  async function savePassword(data: PasswordForm) {
+    setSavingPassword(true)
+    const supabase = createClient()
+    const { error } = await supabase.auth.updateUser({ password: data.newPassword })
+    setSavingPassword(false)
+    if (error) { toast.error(error.message); return }
+    toast.success('Password updated')
+    setSavedPassword(true)
+    passwordForm.reset()
+    setTimeout(() => setSavedPassword(false), 2000)
   }
 
   async function toggleNotifPref(key: keyof NotifPrefs) {
@@ -411,6 +442,73 @@ export default function SettingsPage() {
           <p className="text-[11px] text-muted mt-3 border-t border-[var(--border)] pt-3">
             Preferences are saved automatically. Email notifications can be configured once Resend is connected.
           </p>
+        </Section>
+
+        {/* Change Password */}
+        <Section icon={KeyRound} title="Change Password" description="Set a new password for your account">
+          <form onSubmit={passwordForm.handleSubmit(savePassword)} className="space-y-4">
+            <div>
+              <label className="block text-xs text-secondary mb-1.5">New password</label>
+              <div className="relative">
+                <input
+                  {...passwordForm.register('newPassword')}
+                  type={showNew ? 'text' : 'password'}
+                  placeholder="Min. 8 characters"
+                  className={cn(
+                    'w-full bg-[var(--bg-surface)] border rounded-md px-3 py-2.5 pr-10 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--border-focus)] transition-colors',
+                    passwordForm.formState.errors.newPassword ? 'border-red' : 'border-[var(--border)]'
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-secondary transition-colors"
+                >
+                  {showNew ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              {passwordForm.formState.errors.newPassword && (
+                <p className="text-xs text-red mt-1">{passwordForm.formState.errors.newPassword.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs text-secondary mb-1.5">Confirm new password</label>
+              <div className="relative">
+                <input
+                  {...passwordForm.register('confirmPassword')}
+                  type={showConfirm ? 'text' : 'password'}
+                  placeholder="Re-enter new password"
+                  className={cn(
+                    'w-full bg-[var(--bg-surface)] border rounded-md px-3 py-2.5 pr-10 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--border-focus)] transition-colors',
+                    passwordForm.formState.errors.confirmPassword ? 'border-red' : 'border-[var(--border)]'
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-secondary transition-colors"
+                >
+                  {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              {passwordForm.formState.errors.confirmPassword && (
+                <p className="text-xs text-red mt-1">{passwordForm.formState.errors.confirmPassword.message}</p>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="submit"
+                disabled={savingPassword}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gold text-black text-sm font-semibold rounded-md hover:bg-gold-light transition-colors disabled:opacity-50 min-h-[44px]"
+              >
+                {savingPassword && <Loader2 size={14} className="animate-spin" />}
+                {savedPassword && <Check size={14} />}
+                {savedPassword ? 'Password Updated' : 'Update Password'}
+              </button>
+            </div>
+          </form>
         </Section>
 
         {/* Danger zone */}
