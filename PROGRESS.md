@@ -7,10 +7,10 @@
 ## ▶️ CURRENT STATUS
 
 ```
-NEXT STEP TO BUILD:  Step 16 — Landing Page
-OVERALL PROGRESS:    15 of 20 steps complete
-LAST COMMIT:         step-15: settings page — profile, workspace, notification preferences
-APP STATUS:          running on localhost:3002
+NEXT STEP TO BUILD:  — ALL 20 STEPS COMPLETE —
+OVERALL PROGRESS:    20 of 20 steps complete
+LAST COMMIT:         step-20: final QA — lint errors fixed, npm run build passes clean
+APP STATUS:          running on localhost:3002 · npm run build ✅ zero errors
 ```
 
 ---
@@ -34,11 +34,11 @@ APP STATUS:          running on localhost:3002
 | 13 | Team Management | ✅ Complete | step-13 | Invite, role change, remove member, email scaffolding |
 | 14 | Command Palette (Cmd+K) | ✅ Complete | step-14 | Search, keyboard nav, recent items, Cmd+K shortcut |
 | 15 | Settings | ✅ Complete | step-15 | Profile + avatar, workspace + logo, notif prefs toggles |
-| 16 | Landing Page | ⬜ Not started | — | — |
-| 17 | PWA Setup | ⬜ Not started | — | — |
-| 18 | Capacitor Android Setup | ⬜ Not started | — | — |
-| 19 | Resend Email Scaffolding | ⬜ Not started | — | — |
-| 20 | Final QA | ⬜ Not started | — | — |
+| 16 | Landing Page | ✅ Complete | step-16 | Hero, Features, How it works, Testimonials, CTA, Footer |
+| 17 | PWA Setup | ✅ Complete | step-17 | Icons generated, manifest fixed, offline toast wired |
+| 18 | Capacitor Android Setup | ✅ Complete | step-18 | capacitor.config.ts, android/ generated, privacy page |
+| 19 | Resend Email Scaffolding | ✅ Complete | step-13 | Built in step-13, RESEND_ENABLED=false |
+| 20 | Final QA | ✅ Complete | step-20 | Zero TS errors, npm run build clean, all lint fixed |
 
 **Status icons:**
 ⬜ Not started | 🔄 In progress | ✅ Complete | ❌ Blocked
