@@ -94,6 +94,7 @@ export default function Header({ profile }: HeaderProps) {
       {/* Right */}
       <div className="flex items-center gap-1">
         <button
+          onClick={() => (window as Window & { __openCommandPalette?: () => void }).__openCommandPalette?.()}
           className="min-h-[44px] min-w-[44px] flex items-center justify-center text-secondary hover:text-primary transition-colors rounded-md hover:bg-hover"
           aria-label="Search"
         >
