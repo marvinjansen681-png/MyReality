@@ -78,8 +78,7 @@ export default async function DashboardPage() {
   const upcomingTasks = (upcomingRes.data ?? []) as Task[]
   const completedToday = todayTasks.filter(t => t.status === 'done').length
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const activity = (activityRes.data ?? []).map((item: any) => ({
+  const activity = (activityRes.data ?? []).map((item: Record<string, unknown> & { task?: { title?: string }; profile?: { full_name?: string } }) => ({
     ...item,
     profile: item.profile,
     task_title: item.task?.title ?? undefined,

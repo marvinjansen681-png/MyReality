@@ -223,7 +223,7 @@ export default function SettingsPage() {
     defaultValues: { newPassword: '', confirmPassword: '' },
   })
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     const supabase = createClient()
