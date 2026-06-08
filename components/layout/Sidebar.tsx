@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Eye, CalendarDays, CheckSquare,
   FolderKanban, Users, Settings, ChevronLeft, ChevronRight,
-  LogOut, Building2
+  LogOut
 } from 'lucide-react'
+import { Logo, LogoMark } from '@/components/ui/Logo'
 import { useUIStore } from '@/lib/stores/uiStore'
 import { useWorkspaceStore } from '@/lib/stores/workspaceStore'
 import { createClient } from '@/lib/supabase/client'
@@ -48,16 +49,13 @@ export default function Sidebar({ workspace }: SidebarProps) {
     <div className="flex flex-col h-full">
       {/* Workspace header */}
       <div className={cn(
-        'flex items-center gap-3 px-4 py-4 border-b border-[var(--border)] min-h-[var(--header-height)]',
+        'flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] min-h-[var(--header-height)]',
         sidebarCollapsed && 'lg:justify-center lg:px-2'
       )}>
-        <div className="w-8 h-8 rounded-md bg-[var(--gold-muted)] flex items-center justify-center flex-shrink-0">
-          <Building2 size={16} className="text-gold" />
-        </div>
-        {(!sidebarCollapsed) && (
-          <span className="text-sm font-semibold text-primary truncate">
-            {workspace?.name ?? 'My Workspace'}
-          </span>
+        {sidebarCollapsed ? (
+          <LogoMark size={32} className="flex-shrink-0" />
+        ) : (
+          <Logo href="/dashboard" markSize={32} size="sm" />
         )}
       </div>
 

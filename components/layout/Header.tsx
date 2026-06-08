@@ -6,6 +6,7 @@ import { Menu, Search, Bell, LogOut, Settings, User, CheckCheck, ExternalLink } 
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { useUIStore } from '@/lib/stores/uiStore'
+import { Logo } from '@/components/ui/Logo'
 import { useNotifications } from '@/lib/hooks/useNotifications'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
@@ -82,9 +83,9 @@ export default function Header({ profile }: HeaderProps) {
           <Menu size={20} />
         </button>
 
-        <span className="lg:hidden font-display font-bold text-gold text-lg absolute left-1/2 -translate-x-1/2">
-          MyReality
-        </span>
+        <div className="lg:hidden absolute left-1/2 -translate-x-1/2">
+          <Logo href="/dashboard" markSize={28} size="sm" />
+        </div>
 
         <h1 className="hidden lg:block text-xl font-semibold text-primary truncate">
           {pageTitle}

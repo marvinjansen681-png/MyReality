@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { CheckCircle2, LayoutGrid, Sparkles, Calendar, Users, Bell, ArrowRight, Star } from 'lucide-react'
+import { Logo } from '@/components/ui/Logo'
 
 export const metadata = {
   title: 'MyReality — Build your life. Lead your team.',
@@ -83,7 +84,7 @@ function NavBar() {
   return (
     <header className="sticky top-0 z-40 bg-base/80 backdrop-blur border-b border-[var(--border)]">
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        <span className="font-display font-bold text-gold text-xl">MyReality</span>
+        <Logo href="/" markSize={36} size="md" />
         <div className="flex items-center gap-3">
           <Link
             href="/login"
@@ -293,7 +294,7 @@ function Footer() {
   return (
     <footer className="border-t border-[var(--border)] py-8 px-4">
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <span className="font-display font-bold text-gold text-lg">MyReality</span>
+        <Logo href="/" markSize={28} size="sm" />
         <p className="text-xs text-muted text-center">
           Build your life. Lead your team.
         </p>

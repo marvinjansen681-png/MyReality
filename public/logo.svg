@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <!-- Background gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a1710"/>
+      <stop offset="100%" stop-color="#0a0a0a"/>
+    </radialGradient>
+
+    <!-- Gold gradient for main mark -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e8c97a"/>
+      <stop offset="40%" stop-color="#c9a84c"/>
+      <stop offset="100%" stop-color="#a07830"/>
+    </linearGradient>
+
+    <!-- Gold gradient for text -->
+    <linearGradient id="goldText" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e8c97a"/>
+      <stop offset="50%" stop-color="#c9a84c"/>
+      <stop offset="100%" stop-color="#d4b060"/>
+    </linearGradient>
+
+    <!-- Subtle glow filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Soft shadow -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#c9a84c" flood-opacity="0.2"/>
+    </filter>
+
+    <!-- Clip for circle -->
+    <clipPath id="circleClip">
+      <circle cx="200" cy="165" r="88"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="200" cy="200" r="200" fill="url(#bgGrad)"/>
+
+  <!-- Outer decorative ring -->
+  <circle cx="200" cy="165" r="104" fill="none" stroke="url(#goldGrad)" stroke-width="1" opacity="0.3"/>
+  <circle cx="200" cy="165" r="96" fill="none" stroke="url(#goldGrad)" stroke-width="0.5" opacity="0.2"/>
+
+  <!-- Main icon background circle -->
+  <circle cx="200" cy="165" r="88" fill="#141410" filter="url(#shadow)"/>
+
+  <!-- ── ICON MARK: Stylised "MR" monogram with geometric diamond ── -->
+
+  <!-- Diamond / rhombus outer shape -->
+  <polygon
+    points="200,92 258,150 200,208 142,150"
+    fill="none"
+    stroke="url(#goldGrad)"
+    stroke-width="1.5"
+    opacity="0.5"
+  />
+
+  <!-- Inner diamond accent -->
+  <polygon
+    points="200,108 244,150 200,192 156,150"
+    fill="none"
+    stroke="url(#goldGrad)"
+    stroke-width="0.75"
+    opacity="0.25"
+  />
+
+  <!-- M shape — left stroke -->
+  <path
+    d="M168,174 L168,130 L200,158 L232,130 L232,174"
+    fill="none"
+    stroke="url(#goldGrad)"
+    stroke-width="4.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#glow)"
+  />
+
+  <!-- Horizontal bar beneath M — represents the "R" crossbar / ground line -->
+  <line
+    x1="162" y1="174"
+    x2="238" y2="174"
+    stroke="url(#goldGrad)"
+    stroke-width="2"
+    stroke-linecap="round"
+    opacity="0.6"
+  />
+
+  <!-- Four corner dots — precision marks -->
+  <circle cx="200" cy="91"  r="2.5" fill="url(#goldGrad)" opacity="0.7"/>
+  <circle cx="258" cy="150" r="2.5" fill="url(#goldGrad)" opacity="0.7"/>
+  <circle cx="200" cy="209" r="2.5" fill="url(#goldGrad)" opacity="0.7"/>
+  <circle cx="142" cy="150" r="2.5" fill="url(#goldGrad)" opacity="0.7"/>
+
+  <!-- ── WORDMARK ── -->
+
+  <!-- "My" in light weight -->
+  <text
+    x="200"
+    y="248"
+    text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="22"
+    font-weight="400"
+    letter-spacing="6"
+    fill="#a89f8c"
+    opacity="0.9"
+  >MY</text>
+
+  <!-- "REALITY" in bold display -->
+  <text
+    x="200"
+    y="278"
+    text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="32"
+    font-weight="700"
+    letter-spacing="8"
+    fill="url(#goldText)"
+    filter="url(#glow)"
+  >REALITY</text>
+
+  <!-- Tagline separator line -->
+  <line x1="130" y1="294" x2="270" y2="294" stroke="url(#goldGrad)" stroke-width="0.75" opacity="0.4"/>
+
+  <!-- Tagline -->
+  <text
+    x="200"
+    y="313"
+    text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="10"
+    font-weight="400"
+    letter-spacing="4"
+    fill="#7a7060"
+  >BUILD YOUR LIFE</text>
+
+</svg>

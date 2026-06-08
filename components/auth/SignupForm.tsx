@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
+import { LogoStacked } from '@/components/ui/Logo'
 
 const signupSchema = z.object({
   full_name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -61,8 +62,8 @@ export default function SignupForm() {
 
   return (
     <div className="w-full max-w-sm">
-      <div className="text-center mb-8">
-        <h1 className="font-display text-3xl font-bold text-gold mb-2">MyReality</h1>
+      <div className="flex flex-col items-center mb-8 gap-4">
+        <LogoStacked markSize={72} showTagline />
         <p className="text-secondary text-sm">Create your account</p>
       </div>
 

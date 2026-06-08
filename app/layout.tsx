@@ -36,6 +36,7 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#c9a84c" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <link rel="icon" type="image/svg+xml" href="/logo.svg" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="font-sans bg-base text-primary antialiased">

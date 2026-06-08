@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Logo } from '@/components/ui/Logo'
 
 export const metadata = {
   title: 'Privacy Policy — MyReality',
@@ -8,7 +9,7 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-base text-primary">
       <header className="border-b border-[var(--border)] px-4 h-14 flex items-center justify-between max-w-3xl mx-auto">
-        <Link href="/" className="font-display font-bold text-gold text-xl">MyReality</Link>
+        <Logo href="/" markSize={32} size="sm" />
         <Link href="/login" className="text-sm text-secondary hover:text-primary transition-colors">Sign In</Link>
       </header>
 
