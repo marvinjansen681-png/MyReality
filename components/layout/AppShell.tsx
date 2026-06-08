@@ -2,11 +2,29 @@
 
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
+import { toast } from 'sonner'
 
 const CommandPalette = dynamic(() => import('./CommandPalette'), { ssr: false })
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false)
+
+  // Offline / online detection
+  useEffect(() => {
+    function onOffline() {
+      toast.warning("You're offline — changes will sync when reconnected", { id: 'offline', duration: Infinity })
+    }
+    function onOnline() {
+      toast.dismiss('offline')
+      toast.success('Back online', { duration: 2500 })
+    }
+    window.addEventListener('offline', onOffline)
+    window.addEventListener('online', onOnline)
+    return () => {
+      window.removeEventListener('offline', onOffline)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
