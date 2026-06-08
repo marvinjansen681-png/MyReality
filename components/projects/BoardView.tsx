@@ -21,9 +21,10 @@ interface BoardViewProps {
   userProfile: Profile | null
   projectId: string
   workspaceId?: string | null
+  profileMap?: Record<string, Profile>
 }
 
-export default function BoardView({ columns, initialTasks, userId, userProfile, projectId, workspaceId }: BoardViewProps) {
+export default function BoardView({ columns, initialTasks, userId, userProfile, projectId, workspaceId, profileMap }: BoardViewProps) {
   const [tasks, setTasks] = useState(initialTasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [dragging, setDragging] = useState<Task | null>(null)
@@ -161,6 +162,7 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
               onTaskClick={setActiveTask}
               onAddTask={addTask}
               onMoveTask={moveTask}
+              profileMap={profileMap}
             />
           ))}
         </div>
@@ -173,6 +175,7 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
           onTaskClick={setActiveTask}
           onAddTask={addTask}
           onMoveTask={moveTask}
+          profileMap={profileMap}
         />
 
         <DragOverlay>
@@ -205,13 +208,14 @@ function columnStatusMap(columnId: string, columns: Column[]): Task['status'] {
   return 'todo'
 }
 
-function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onMoveTask }: {
+function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onMoveTask, profileMap }: {
   columns: Column[]
   tasks: Task[]
   colMeta: { id: string; title: string }[]
   onTaskClick: (t: Task) => void
   onAddTask: (colId: string, title: string) => void
   onMoveTask: (t: Task, colId: string) => void
+  profileMap?: Record<string, Profile>
 }) {
   const [activeColIdx, setActiveColIdx] = useState(0)
   const activeCol = columns[activeColIdx]
@@ -248,6 +252,7 @@ function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onM
             onClick={onTaskClick}
             onMoveToColumn={onMoveTask}
             columns={colMeta}
+            profileMap={profileMap}
             index={i}
           />
         ))}

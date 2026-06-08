@@ -16,6 +16,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const [userId, setUserId] = useState<string | null>(null)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
   const [userProfile, setUserProfile] = useState<Profile | null>(null)
+  const [profileMap, setProfileMap] = useState<Record<string, Profile>>({})
   const [view, setView] = useState<'board' | 'list'>('board')
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -37,7 +38,22 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       ])
 
       if (profileRes.data) setUserProfile(profileRes.data as Profile)
-      if (memberRes.data) setWorkspaceId(memberRes.data.workspace_id)
+      if (memberRes.data) {
+        setWorkspaceId(memberRes.data.workspace_id)
+        // Fetch all workspace member profiles for assignee avatars
+        const { data: members } = await supabase
+          .from('workspace_members')
+          .select('user_id, profile:profiles!workspace_members_user_id_fkey(id, full_name, avatar_url, email, created_at, updated_at)')
+          .eq('workspace_id', memberRes.data.workspace_id)
+        if (members) {
+          const map: Record<string, Profile> = {}
+          ;(members as unknown as { user_id: string; profile: Profile | Profile[] | null }[]).forEach(m => {
+            const p = Array.isArray(m.profile) ? m.profile[0] : m.profile
+            if (p) map[m.user_id] = p
+          })
+          setProfileMap(map)
+        }
+      }
       if (!projectRes.data) { setNotFound(true); setLoading(false); return }
       setProject(projectRes.data as Project)
       setColumns((columnsRes.data ?? []) as Column[])
@@ -107,6 +123,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           userProfile={userProfile}
           projectId={params.id}
           workspaceId={workspaceId}
+          profileMap={profileMap}
         />
       ) : (
         <ListView

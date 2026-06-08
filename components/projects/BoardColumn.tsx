@@ -6,7 +6,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Plus, MoreHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import TaskCard from './TaskCard'
-import type { Column, Task } from '@/types'
+import type { Column, Task, Profile } from '@/types'
 
 interface BoardColumnProps {
   column: Column
@@ -15,9 +15,10 @@ interface BoardColumnProps {
   onTaskClick: (task: Task) => void
   onAddTask: (columnId: string, title: string) => void
   onMoveTask: (task: Task, columnId: string) => void
+  profileMap?: Record<string, Profile>
 }
 
-export default function BoardColumn({ column, tasks, allColumns, onTaskClick, onAddTask, onMoveTask }: BoardColumnProps) {
+export default function BoardColumn({ column, tasks, allColumns, onTaskClick, onAddTask, onMoveTask, profileMap }: BoardColumnProps) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -73,6 +74,7 @@ export default function BoardColumn({ column, tasks, allColumns, onTaskClick, on
               onClick={onTaskClick}
               onMoveToColumn={onMoveTask}
               columns={allColumns}
+              profileMap={profileMap}
               index={i}
             />
           ))}
