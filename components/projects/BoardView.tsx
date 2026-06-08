@@ -8,6 +8,7 @@ import {
 import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { useRealtime } from '@/lib/hooks/useRealtime'
 import BoardColumn from './BoardColumn'
 import TaskCard from './TaskCard'
 import TaskDetail from './TaskDetail'
@@ -19,12 +20,31 @@ interface BoardViewProps {
   userId: string
   userProfile: Profile | null
   projectId: string
+  workspaceId?: string | null
 }
 
-export default function BoardView({ columns, initialTasks, userId, userProfile, projectId }: BoardViewProps) {
+export default function BoardView({ columns, initialTasks, userId, userProfile, projectId, workspaceId }: BoardViewProps) {
   const [tasks, setTasks] = useState(initialTasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [dragging, setDragging] = useState<Task | null>(null)
+
+  useRealtime({
+    workspaceId: workspaceId ?? null,
+    currentUserId: userId,
+    onInsert: (task) => {
+      if (task.project_id === projectId) {
+        setTasks(prev => prev.some(t => t.id === task.id) ? prev : [...prev, task])
+      }
+    },
+    onUpdate: (task) => {
+      if (task.project_id === projectId) {
+        setTasks(prev => prev.map(t => t.id === task.id ? task : t))
+      }
+    },
+    onDelete: (id) => {
+      setTasks(prev => prev.filter(t => t.id !== id))
+    },
+  })
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),

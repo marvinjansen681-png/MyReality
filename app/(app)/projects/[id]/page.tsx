@@ -14,6 +14,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const [columns, setColumns] = useState<Column[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [userId, setUserId] = useState<string | null>(null)
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
   const [userProfile, setUserProfile] = useState<Profile | null>(null)
   const [view, setView] = useState<'board' | 'list'>('board')
   const [loading, setLoading] = useState(true)
@@ -27,14 +28,16 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       if (!user) return
       setUserId(user.id)
 
-      const [profileRes, projectRes, columnsRes, tasksRes] = await Promise.all([
+      const [profileRes, memberRes, projectRes, columnsRes, tasksRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('workspace_members').select('workspace_id').eq('user_id', user.id).single(),
         supabase.from('projects').select('*').eq('id', params.id).single(),
         supabase.from('columns').select('*').eq('project_id', params.id).order('position'),
         supabase.from('tasks').select('*').eq('project_id', params.id).eq('is_personal', false).is('parent_task_id', null).order('position'),
       ])
 
       if (profileRes.data) setUserProfile(profileRes.data as Profile)
+      if (memberRes.data) setWorkspaceId(memberRes.data.workspace_id)
       if (!projectRes.data) { setNotFound(true); setLoading(false); return }
       setProject(projectRes.data as Project)
       setColumns((columnsRes.data ?? []) as Column[])
@@ -103,6 +106,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           userId={userId ?? ''}
           userProfile={userProfile}
           projectId={params.id}
+          workspaceId={workspaceId}
         />
       ) : (
         <ListView
