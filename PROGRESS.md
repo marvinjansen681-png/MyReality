@@ -7,9 +7,9 @@
 ## ▶️ CURRENT STATUS
 
 ```
-NEXT STEP TO BUILD:  Step 4 — Auth + Workspace Creation
-OVERALL PROGRESS:    3 of 20 steps complete
-LAST COMMIT:         step-3: supabase setup — tested ✓
+NEXT STEP TO BUILD:  Step 5 — App Shell (Sidebar + Header)
+OVERALL PROGRESS:    4 of 20 steps complete
+LAST COMMIT:         step-4: auth + workspace creation — tested ✓
 APP STATUS:          running on localhost:3001
 ```
 
@@ -22,7 +22,7 @@ APP STATUS:          running on localhost:3001
 | 1 | Project Initialisation | ✅ Complete | step-1 | Next.js 14 + all packages + folder structure + design tokens |
 | 2 | TypeScript Types | ✅ Complete | step-2 | All types from Section 8 — zero TS errors |
 | 3 | Supabase Setup | ✅ Complete | step-3 | All 11 tables + RLS + visions bucket verified OK |
-| 4 | Auth + Workspace Creation | ⬜ Not started | — | — |
+| 4 | Auth + Workspace Creation | ✅ Complete | step-4 | Login, signup, Google OAuth, workspace modal, middleware |
 | 5 | App Shell (Sidebar + Header) | ⬜ Not started | — | — |
 | 6 | Dashboard | ⬜ Not started | — | — |
 | 7 | Vision Board | ⬜ Not started | — | — |
@@ -102,12 +102,25 @@ Notes:
 
 ### Step 4 — Auth + Workspace Creation
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
-Notes:      —
-Test account used: [Claude logs the test email used during testing]
+Status:     ✅ Complete
+Started:    2026-06-08
+Completed:  2026-06-08
+Commit:     step-4
+Notes:
+  - middleware.ts: session refresh + route protection for all /dashboard, /vision, etc.
+  - LoginForm: email+password + Google OAuth + forgot password (Supabase magic link)
+  - SignupForm: full name + email + password (min 8) + Google OAuth
+  - Both forms: React Hook Form + Zod, inline errors, Sonner toasts, mobile-first
+  - /app/auth/callback/route.ts: OAuth code exchange
+  - /app/auth/signout/route.ts: POST to sign out
+  - CreateWorkspaceModal: checks on mount if user has workspace, shows if not
+    - Not dismissible — required before accessing dashboard
+    - Creates workspace + workspace_member row (role: owner)
+    - Auto-generates slug from workspace name
+    - Slug collision handled with friendly error toast
+  - AppLayout: server-side auth check, redirects to /login if no session
+  - Dev server confirmed: localhost:3002, zero runtime errors
+  - npx tsc --noEmit: ZERO errors
 ```
 
 ### Step 5 — App Shell
