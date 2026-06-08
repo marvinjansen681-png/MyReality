@@ -7,9 +7,9 @@
 ## ▶️ CURRENT STATUS
 
 ```
-NEXT STEP TO BUILD:  Step 3 — Supabase Setup
-OVERALL PROGRESS:    2 of 20 steps complete
-LAST COMMIT:         step-2: typescript types — tested ✓
+NEXT STEP TO BUILD:  Step 4 — Auth + Workspace Creation
+OVERALL PROGRESS:    3 of 20 steps complete
+LAST COMMIT:         step-3: supabase setup — tested ✓
 APP STATUS:          running on localhost:3001
 ```
 
@@ -21,7 +21,7 @@ APP STATUS:          running on localhost:3001
 |---|---|---|---|---|
 | 1 | Project Initialisation | ✅ Complete | step-1 | Next.js 14 + all packages + folder structure + design tokens |
 | 2 | TypeScript Types | ✅ Complete | step-2 | All types from Section 8 — zero TS errors |
-| 3 | Supabase Setup | ⬜ Not started | — | — |
+| 3 | Supabase Setup | ✅ Complete | step-3 | All 11 tables + RLS + visions bucket verified OK |
 | 4 | Auth + Workspace Creation | ⬜ Not started | — | — |
 | 5 | App Shell (Sidebar + Header) | ⬜ Not started | — | — |
 | 6 | Dashboard | ⬜ Not started | — | — |
@@ -82,12 +82,22 @@ Notes:
 
 ### Step 3 — Supabase Setup
 ```
-Status:     ⬜ Not started
-Started:    —
-Completed:  —
-Commit:     —
+Status:     ✅ Complete
+Started:    2026-06-08
+Completed:  2026-06-08
+Commit:     step-3
 Supabase project URL: https://khcpvjtphzidwzbhtayh.supabase.co
-Tables created: [Claude lists them after migration]
+Tables created:
+  profiles, workspaces, workspace_members, projects, columns,
+  tasks, task_comments, task_activity, weekly_plans, visions, notifications
+RLS: enabled on all tables (verified via REST API — all 11 returned 200 OK)
+Storage: visions bucket created
+Realtime: enabled on tasks, task_comments, task_activity, notifications
+Notes:
+  - Supabase clients written: lib/supabase/client.ts (browser), server.ts, middleware.ts
+  - Used @supabase/ssr 0.3.0 get/set/remove cookie API (not getAll/setAll)
+  - Migration run manually in Supabase SQL editor by Marvin (env blocks direct DB connection)
+  - Combined migration file: supabase/migrations/000_run_all.sql (for reference)
 ```
 
 ### Step 4 — Auth + Workspace Creation
@@ -291,6 +301,7 @@ Mobile tested: —
 |---|---|---|
 | 2026-06-08 | Step 1 | Complete — Next.js + all packages + folder structure + design tokens |
 | 2026-06-08 | Step 2 | Complete — all TypeScript types written, zero errors |
+| 2026-06-08 | Step 3 | Complete — 11 tables + RLS + storage bucket verified in Supabase |
 
 ---
 
