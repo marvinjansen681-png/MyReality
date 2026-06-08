@@ -8,10 +8,30 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      backgroundImage: {
-        "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-        "gradient-conic":
-          "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
+      colors: {
+        base: 'var(--bg-base)',
+        surface: 'var(--bg-surface)',
+        card: 'var(--bg-card)',
+        hover: 'var(--bg-hover)',
+        border: 'var(--border)',
+        gold: 'var(--gold)',
+        'gold-light': 'var(--gold-light)',
+        primary: 'var(--text-primary)',
+        secondary: 'var(--text-secondary)',
+        muted: 'var(--text-muted)',
+        green: 'var(--green)',
+        red: 'var(--red)',
+        blue: 'var(--blue)',
+        purple: 'var(--purple)',
+      },
+      fontFamily: {
+        display: ['"Playfair Display"', 'serif'],
+        sans: ['"DM Sans"', 'sans-serif'],
+      },
+      borderRadius: {
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
       },
     },
   },
