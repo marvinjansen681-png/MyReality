@@ -338,3 +338,50 @@ CREATE POLICY "Users can view own vision images" ON storage.objects FOR SELECT
 DROP POLICY IF EXISTS "Users can delete own vision images" ON storage.objects;
 CREATE POLICY "Users can delete own vision images" ON storage.objects FOR DELETE
   USING (bucket_id = 'visions' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+
+-- =========================================
+-- 015 — Patch: notif_prefs + avatars/logos storage
+-- =========================================
+
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS notif_prefs jsonb NOT NULL DEFAULT '{
+    "task_assigned": true,
+    "task_commented": true,
+    "task_due": true,
+    "mention": true,
+    "vision_due": true
+  }'::jsonb;
+
+ALTER TABLE workspaces
+  ADD COLUMN IF NOT EXISTS logo_url text;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES
+  ('avatars',          'avatars',          true),
+  ('workspace-logos',  'workspace-logos',  true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Users can upload their own avatar"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+CREATE POLICY "Avatars are publicly readable"
+  ON storage.objects FOR SELECT TO public
+  USING (bucket_id = 'avatars');
+
+CREATE POLICY "Users can update their own avatar"
+  ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+CREATE POLICY "Workspace logo upload"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'workspace-logos');
+
+CREATE POLICY "Workspace logos are publicly readable"
+  ON storage.objects FOR SELECT TO public
+  USING (bucket_id = 'workspace-logos');
+
+CREATE POLICY "Workspace logo update"
+  ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'workspace-logos');
