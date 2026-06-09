@@ -147,14 +147,19 @@ export default function ProjectsPage() {
           <>
             <motion.div className="fixed inset-0 bg-black/60 z-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setModalOpen(false)} />
             <motion.div
-              className="fixed z-50 bg-card border border-[var(--border)] bottom-0 left-0 right-0 rounded-t-2xl max-h-[90dvh] overflow-y-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:w-full sm:max-w-md sm:max-h-[88vh] sm:overflow-y-auto"
+              className="fixed z-50 bg-card border border-[var(--border)] flex flex-col bottom-0 left-0 right-0 rounded-t-2xl max-h-[90dvh] sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:w-full sm:max-w-md sm:max-h-[85vh]"
               initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '100%', opacity: 0 }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             >
-              <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-10 h-1 rounded-full bg-[var(--border)]" /></div>
-              <div className="p-5">
-                <h2 className="font-display text-xl font-bold text-primary mb-5">New Project</h2>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {/* Drag handle mobile */}
+              <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0"><div className="w-10 h-1 rounded-full bg-[var(--border)]" /></div>
+              {/* Sticky header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] flex-shrink-0">
+                <h2 className="font-display text-xl font-bold text-primary">New Project</h2>
+              </div>
+              {/* Scrollable body */}
+              <div className="flex-1 overflow-y-auto px-5 py-4">
+                <form id="project-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                   <div>
                     <label className="block text-xs text-secondary mb-1.5">Project name *</label>
                     <input
@@ -198,14 +203,15 @@ export default function ProjectsPage() {
                       ))}
                     </div>
                   </div>
-                  <div className="flex gap-3 pt-1">
-                    <button type="button" onClick={() => setModalOpen(false)} className="flex-1 py-2.5 rounded-md border border-[var(--border)] text-sm text-secondary hover:bg-hover transition-colors">Cancel</button>
-                    <button type="submit" disabled={creating} className="flex-1 py-2.5 rounded-md bg-gold text-black text-sm font-semibold hover:bg-gold-light transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
-                      {creating && <Loader2 size={14} className="animate-spin" />}
-                      Create Project
-                    </button>
-                  </div>
                 </form>
+              </div>
+              {/* Sticky footer */}
+              <div className="flex gap-3 px-5 py-4 border-t border-[var(--border)] flex-shrink-0">
+                <button type="button" onClick={() => setModalOpen(false)} className="flex-1 py-2.5 rounded-md border border-[var(--border)] text-sm text-secondary hover:bg-hover transition-colors">Cancel</button>
+                <button type="submit" form="project-form" disabled={creating} className="flex-1 py-2.5 rounded-md bg-gold text-black text-sm font-semibold hover:bg-gold-light transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
+                  {creating && <Loader2 size={14} className="animate-spin" />}
+                  Create Project
+                </button>
               </div>
             </motion.div>
           </>

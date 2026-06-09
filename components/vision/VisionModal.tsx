@@ -169,12 +169,12 @@ export default function VisionModal({
           {/* Sheet / Dialog */}
           <motion.div
             className={cn(
-              'fixed z-50 bg-card border border-[var(--border)]',
+              'fixed z-50 bg-card border border-[var(--border)] flex flex-col',
               // Mobile: bottom sheet
-              'bottom-0 left-0 right-0 rounded-t-2xl max-h-[92dvh] overflow-y-auto',
+              'bottom-0 left-0 right-0 rounded-t-2xl max-h-[92dvh]',
               // Desktop: centered dialog
               'sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2',
-              'sm:rounded-xl sm:w-full sm:max-w-lg sm:max-h-[88vh] sm:overflow-y-auto'
+              'sm:rounded-xl sm:w-full sm:max-w-lg sm:max-h-[85vh]'
             )}
             initial={{ y: '100%', opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -182,25 +182,26 @@ export default function VisionModal({
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
             {/* Drag handle (mobile) */}
-            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+            <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
               <div className="w-10 h-1 rounded-full bg-[var(--border)]" />
             </div>
 
-            <div className="p-5">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="font-display text-xl font-bold text-primary">
-                  {editing ? 'Edit Vision' : 'Add Vision'}
-                </h2>
-                <button
-                  onClick={handleClose}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-hover text-secondary hover:text-primary transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              </div>
+            {/* Sticky header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] flex-shrink-0">
+              <h2 className="font-display text-xl font-bold text-primary">
+                {editing ? 'Edit Vision' : 'Add Vision'}
+              </h2>
+              <button
+                onClick={handleClose}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-hover text-secondary hover:text-primary transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Scrollable form body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <form id="vision-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 {/* Title */}
                 <div>
                   <label className="block text-xs text-secondary mb-1.5">Title *</label>
@@ -235,7 +236,7 @@ export default function VisionModal({
                   <textarea
                     {...register('description')}
                     placeholder="Describe your vision..."
-                    rows={3}
+                    rows={2}
                     className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-md px-3 py-2.5 text-sm text-primary placeholder:text-muted resize-none focus:outline-none focus:border-[var(--border-focus)] transition-colors"
                   />
                 </div>
@@ -285,7 +286,7 @@ export default function VisionModal({
                       onDrop={handleDrop}
                       onClick={() => fileRef.current?.click()}
                       className={cn(
-                        'border-2 border-dashed rounded-md p-6 flex flex-col items-center gap-2 cursor-pointer transition-colors',
+                        'border-2 border-dashed rounded-md p-4 flex flex-col items-center gap-2 cursor-pointer transition-colors',
                         draggingOver ? 'border-gold bg-[var(--gold-muted)]' : 'border-[var(--border)] hover:border-[var(--border-focus)]'
                       )}
                     >
@@ -313,26 +314,27 @@ export default function VisionModal({
                     onChange={handleFilePick}
                   />
                 </div>
-
-                {/* Actions */}
-                <div className="flex gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleClose}
-                    className="flex-1 py-2.5 rounded-md border border-[var(--border)] text-sm text-secondary hover:bg-hover transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving || uploading}
-                    className="flex-1 py-2.5 rounded-md bg-gold text-black text-sm font-semibold hover:bg-gold-light transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {saving && <Loader2 size={14} className="animate-spin" />}
-                    {editing ? 'Save Changes' : 'Add Vision'}
-                  </button>
-                </div>
               </form>
+            </div>
+
+            {/* Sticky footer — always visible */}
+            <div className="flex gap-3 px-5 py-4 border-t border-[var(--border)] flex-shrink-0">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="flex-1 py-2.5 rounded-md border border-[var(--border)] text-sm text-secondary hover:bg-hover transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="vision-form"
+                disabled={saving || uploading}
+                className="flex-1 py-2.5 rounded-md bg-gold text-black text-sm font-semibold hover:bg-gold-light transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {saving && <Loader2 size={14} className="animate-spin" />}
+                {editing ? 'Save Changes' : 'Add Vision'}
+              </button>
             </div>
           </motion.div>
         </>
