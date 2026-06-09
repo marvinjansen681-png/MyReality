@@ -174,7 +174,7 @@ export default function VisionModal({
               'bottom-0 left-0 right-0 rounded-t-2xl max-h-[92dvh] overflow-y-auto',
               // Desktop: centered dialog
               'sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2',
-              'sm:rounded-xl sm:w-full sm:max-w-lg sm:max-h-[90vh]'
+              'sm:rounded-xl sm:w-full sm:max-w-lg sm:max-h-[88vh] sm:overflow-y-auto'
             )}
             initial={{ y: '100%', opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
