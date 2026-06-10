@@ -146,8 +146,9 @@ export default function ProjectsPage() {
         {modalOpen && (
           <>
             <motion.div className="fixed inset-0 bg-black/60 z-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setModalOpen(false)} />
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
             <motion.div
-              className="fixed z-50 bg-card border border-[var(--border)] flex flex-col bottom-0 left-0 right-0 rounded-t-2xl max-h-[90dvh] sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:w-full sm:max-w-md sm:max-h-[85vh]"
+              className="pointer-events-auto bg-card border border-[var(--border)] flex flex-col w-full rounded-t-2xl max-h-[90dvh] sm:rounded-xl sm:max-w-md sm:max-h-[85vh]"
               initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '100%', opacity: 0 }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             >
@@ -214,6 +215,7 @@ export default function ProjectsPage() {
                 </button>
               </div>
             </motion.div>
+            </div>
           </>
         )}
       </AnimatePresence>

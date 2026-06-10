@@ -287,8 +287,9 @@ export default function TeamPage() {
         {inviteOpen && (
           <>
             <motion.div className="fixed inset-0 bg-black/60 z-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setInviteOpen(false)} />
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
             <motion.div
-              className="fixed z-50 bg-card border border-[var(--border)] bottom-0 left-0 right-0 rounded-t-2xl sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:w-full sm:max-w-md"
+              className="pointer-events-auto bg-card border border-[var(--border)] w-full rounded-t-2xl sm:rounded-xl sm:max-w-md max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto"
               initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '100%', opacity: 0 }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             >
@@ -335,6 +336,7 @@ export default function TeamPage() {
                 </form>
               </div>
             </motion.div>
+            </div>
           </>
         )}
       </AnimatePresence>

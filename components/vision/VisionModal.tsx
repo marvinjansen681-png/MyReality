@@ -167,20 +167,20 @@ export default function VisionModal({
           />
 
           {/* Sheet / Dialog */}
-          <motion.div
-            className={cn(
-              'fixed z-50 bg-card border border-[var(--border)] flex flex-col',
-              // Mobile: bottom sheet
-              'bottom-0 left-0 right-0 rounded-t-2xl max-h-[92dvh]',
-              // Desktop: centered dialog
-              'sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2',
-              'sm:rounded-xl sm:w-full sm:max-w-lg sm:max-h-[85vh]'
-            )}
-            initial={{ y: '100%', opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: '100%', opacity: 0 }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          >
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
+            <motion.div
+              className={cn(
+                'pointer-events-auto bg-card border border-[var(--border)] flex flex-col w-full',
+                // Mobile: bottom sheet
+                'rounded-t-2xl max-h-[92dvh]',
+                // Desktop: centered dialog
+                'sm:rounded-xl sm:max-w-lg sm:max-h-[85vh]'
+              )}
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            >
             {/* Drag handle (mobile) */}
             <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
               <div className="w-10 h-1 rounded-full bg-[var(--border)]" />
@@ -336,7 +336,8 @@ export default function VisionModal({
                 {editing ? 'Save Changes' : 'Add Vision'}
               </button>
             </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
