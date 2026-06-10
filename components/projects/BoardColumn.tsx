@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Plus, MoreHorizontal } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import TaskCard from './TaskCard'
 import type { Column, Task, Profile } from '@/types'
@@ -57,9 +57,6 @@ export default function BoardColumn({ column, tasks, allColumns, onTaskClick, on
             className="w-7 h-7 flex items-center justify-center text-muted hover:text-primary hover:bg-hover rounded-md transition-colors"
           >
             <Plus size={14} />
-          </button>
-          <button className="w-7 h-7 flex items-center justify-center text-muted hover:text-primary hover:bg-hover rounded-md transition-colors">
-            <MoreHorizontal size={14} />
           </button>
         </div>
       </div>

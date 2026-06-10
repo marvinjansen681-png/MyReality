@@ -118,7 +118,8 @@ export default function TaskList({ initialTasks, userId }: TaskListProps) {
   async function bulkMarkDone() {
     const ids = Array.from(selected)
     const supabase = createClient()
-    await supabase.from('tasks').update({ status: 'done', updated_at: new Date().toISOString() }).in('id', ids)
+    const { error } = await supabase.from('tasks').update({ status: 'done', updated_at: new Date().toISOString() }).in('id', ids)
+    if (error) { toast.error('Failed to update tasks'); return }
     setTasks(prev => prev.map(t => selected.has(t.id) ? { ...t, status: 'done' as const } : t))
     setSelected(new Set())
     toast.success(`${ids.length} task${ids.length > 1 ? 's' : ''} marked done`)
@@ -127,7 +128,8 @@ export default function TaskList({ initialTasks, userId }: TaskListProps) {
   async function bulkSetPriority(priority: TaskPriority) {
     const ids = Array.from(selected)
     const supabase = createClient()
-    await supabase.from('tasks').update({ priority, updated_at: new Date().toISOString() }).in('id', ids)
+    const { error } = await supabase.from('tasks').update({ priority, updated_at: new Date().toISOString() }).in('id', ids)
+    if (error) { toast.error('Failed to update priority'); return }
     setTasks(prev => prev.map(t => selected.has(t.id) ? { ...t, priority } : t))
     setSelected(new Set())
     toast.success(`Priority updated`)
@@ -136,7 +138,8 @@ export default function TaskList({ initialTasks, userId }: TaskListProps) {
   async function bulkDelete() {
     const ids = Array.from(selected)
     const supabase = createClient()
-    await supabase.from('tasks').delete().in('id', ids)
+    const { error } = await supabase.from('tasks').delete().in('id', ids)
+    if (error) { toast.error('Failed to delete tasks'); return }
     setTasks(prev => prev.filter(t => !selected.has(t.id)))
     setSelected(new Set())
     toast.success(`${ids.length} task${ids.length > 1 ? 's' : ''} deleted`)

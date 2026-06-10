@@ -66,6 +66,15 @@ export default function TaskDrawer({ task, userId, onClose, onUpdated, onDeleted
     if (addingLabel) labelInputRef.current?.focus()
   }, [addingLabel])
 
+  useEffect(() => {
+    if (!task) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [task, onClose])
+
   async function loadSubtasks() {
     if (!task) return
     const supabase = createClient()
@@ -297,7 +306,7 @@ export default function TaskDrawer({ task, userId, onClose, onUpdated, onDeleted
                       value={newLabel}
                       onChange={e => setNewLabel(e.target.value)}
                       onBlur={addLabel}
-                      onKeyDown={e => { if (e.key === 'Enter') addLabel(); if (e.key === 'Escape') { setAddingLabel(false); setNewLabel('') } }}
+                      onKeyDown={e => { if (e.key === 'Enter') addLabel(); if (e.key === 'Escape') { e.stopPropagation(); setAddingLabel(false); setNewLabel('') } }}
                       placeholder="Label..."
                       className="text-xs bg-[var(--bg-surface)] border border-[var(--border-focus)] rounded-full px-2 py-1 text-primary outline-none w-24"
                     />

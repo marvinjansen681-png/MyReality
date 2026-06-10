@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { CheckCircle2, Circle } from 'lucide-react'
+import { CheckCircle2, Circle, ListTodo } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils/cn'
+import EmptyState from '@/components/shared/EmptyState'
 import PriorityBadge from '@/components/shared/PriorityBadge'
 import TaskDetail from './TaskDetail'
 import type { Task, Column, Profile } from '@/types'
@@ -93,7 +94,7 @@ export default function ListView({ initialTasks, columns, userId, userProfile }:
           </tbody>
         </table>
         {tasks.length === 0 && (
-          <p className="text-center text-sm text-muted py-8">No tasks in this project yet.</p>
+          <EmptyState icon={ListTodo} title="No tasks here" description="No tasks in this project yet." />
         )}
       </div>
 
@@ -132,7 +133,7 @@ export default function ListView({ initialTasks, columns, userId, userProfile }:
           </div>
         ))}
         {tasks.length === 0 && (
-          <p className="text-center text-sm text-muted py-8">No tasks yet.</p>
+          <EmptyState icon={ListTodo} title="No tasks here" description="No tasks in this project yet." />
         )}
       </div>
 

@@ -65,6 +65,15 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
   }, [task?.id])
 
   useEffect(() => {
+    if (!task) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [task, onClose])
+
+  useEffect(() => {
     if (addingLabel) labelInputRef.current?.focus()
   }, [addingLabel])
 
@@ -257,7 +266,7 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
                         value={newLabel}
                         onChange={e => setNewLabel(e.target.value)}
                         onBlur={addLabel}
-                        onKeyDown={e => { if (e.key === 'Enter') addLabel(); if (e.key === 'Escape') { setAddingLabel(false); setNewLabel('') } }}
+                        onKeyDown={e => { if (e.key === 'Enter') addLabel(); if (e.key === 'Escape') { e.stopPropagation(); setAddingLabel(false); setNewLabel('') } }}
                         placeholder="Label..."
                         className="text-xs bg-[var(--bg-surface)] border border-[var(--border-focus)] rounded-full px-2 py-1 text-primary outline-none w-24"
                       />
