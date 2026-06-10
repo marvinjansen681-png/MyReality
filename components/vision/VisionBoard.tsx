@@ -177,6 +177,7 @@ export default function VisionBoard({ initialVisions, userId, workspaceId }: Vis
         userId={userId}
         workspaceId={workspaceId}
         editing={editing}
+        nextPosition={visions.length}
       />
     </>
   )

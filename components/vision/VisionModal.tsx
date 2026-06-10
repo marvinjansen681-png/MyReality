@@ -30,10 +30,11 @@ interface VisionModalProps {
   userId: string
   workspaceId: string | null
   editing?: Vision | null
+  nextPosition: number
 }
 
 export default function VisionModal({
-  open, onClose, onSaved, userId, workspaceId, editing
+  open, onClose, onSaved, userId, workspaceId, editing, nextPosition
 }: VisionModalProps) {
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -126,7 +127,7 @@ export default function VisionModal({
           target_date: data.target_date || null,
           status: data.status,
           image_url: imageUrl,
-          position: Date.now(),
+          position: nextPosition,
         })
         .select()
         .single()
