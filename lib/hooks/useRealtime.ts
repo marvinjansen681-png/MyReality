@@ -12,7 +12,7 @@ type RealtimeTaskPayload = {
 }
 
 interface UseRealtimeOptions {
-  workspaceId: string | null
+  projectId: string | null
   currentUserId: string
   onInsert?: (task: Task) => void
   onUpdate?: (task: Task) => void
@@ -20,7 +20,7 @@ interface UseRealtimeOptions {
 }
 
 export function useRealtime({
-  workspaceId,
+  projectId,
   currentUserId,
   onInsert,
   onUpdate,
@@ -29,10 +29,10 @@ export function useRealtime({
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
 
   useEffect(() => {
-    if (!workspaceId) return
+    if (!projectId) return
 
     const supabase = createClient()
-    const channel = supabase.channel(`workspace:${workspaceId}:tasks`)
+    const channel = supabase.channel(`project:${projectId}:tasks`)
 
     channel
       .on(
@@ -41,7 +41,7 @@ export function useRealtime({
           event: 'INSERT',
           schema: 'public',
           table: 'tasks',
-          filter: `project_id=in.(${workspaceId})`,
+          filter: `project_id=eq.${projectId}`,
         },
         (payload) => {
           const task = payload.new as Task
@@ -58,6 +58,7 @@ export function useRealtime({
           event: 'UPDATE',
           schema: 'public',
           table: 'tasks',
+          filter: `project_id=eq.${projectId}`,
         },
         (payload) => {
           const task = payload.new as Task
@@ -79,6 +80,9 @@ export function useRealtime({
           event: 'DELETE',
           schema: 'public',
           table: 'tasks',
+          // No project_id filter: DELETE payloads only include the primary key
+          // (no REPLICA IDENTITY FULL), so a project_id filter would drop every event.
+          // RLS already scopes which deletes this client receives.
         },
         (payload) => {
           const id = (payload.old as { id: string }).id
@@ -92,5 +96,5 @@ export function useRealtime({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [workspaceId, currentUserId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectId, currentUserId]) // eslint-disable-line react-hooks/exhaustive-deps
 }

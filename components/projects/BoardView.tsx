@@ -20,17 +20,16 @@ interface BoardViewProps {
   userId: string
   userProfile: Profile | null
   projectId: string
-  workspaceId?: string | null
   profileMap?: Record<string, Profile>
 }
 
-export default function BoardView({ columns, initialTasks, userId, userProfile, projectId, workspaceId, profileMap }: BoardViewProps) {
+export default function BoardView({ columns, initialTasks, userId, userProfile, projectId, profileMap }: BoardViewProps) {
   const [tasks, setTasks] = useState(initialTasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [dragging, setDragging] = useState<Task | null>(null)
 
   useRealtime({
-    workspaceId: workspaceId ?? null,
+    projectId,
     currentUserId: userId,
     onInsert: (task) => {
       if (task.project_id === projectId) {

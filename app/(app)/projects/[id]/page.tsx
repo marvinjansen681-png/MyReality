@@ -14,7 +14,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const [columns, setColumns] = useState<Column[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [userId, setUserId] = useState<string | null>(null)
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
   const [userProfile, setUserProfile] = useState<Profile | null>(null)
   const [profileMap, setProfileMap] = useState<Record<string, Profile>>({})
   const [view, setView] = useState<'board' | 'list'>('board')
@@ -39,7 +38,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 
       if (profileRes.data) setUserProfile(profileRes.data as Profile)
       if (memberRes.data) {
-        setWorkspaceId(memberRes.data.workspace_id)
         // Fetch all workspace member profiles for assignee avatars
         const { data: members } = await supabase
           .from('workspace_members')
@@ -122,7 +120,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           userId={userId ?? ''}
           userProfile={userProfile}
           projectId={params.id}
-          workspaceId={workspaceId}
           profileMap={profileMap}
         />
       ) : (

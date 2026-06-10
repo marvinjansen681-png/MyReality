@@ -100,7 +100,7 @@ export default function TeamPage() {
       .from('profiles')
       .select('id, full_name, email')
       .eq('email', data.email)
-      .single()
+      .maybeSingle()
 
     if (!profile) {
       // User doesn't exist yet — send invite email only
