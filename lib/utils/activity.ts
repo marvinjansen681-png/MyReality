@@ -16,20 +16,3 @@ export async function logActivity(
   })
 }
 
-export async function insertNotification(params: {
-  userId: string
-  type: 'task_assigned' | 'task_commented' | 'task_due' | 'mention' | 'vision_due'
-  title: string
-  body: string
-  link?: string
-}) {
-  const supabase = createClient()
-  await supabase.from('notifications').insert({
-    user_id: params.userId,
-    type: params.type,
-    title: params.title,
-    body: params.body,
-    link: params.link ?? null,
-    read: false,
-  })
-}

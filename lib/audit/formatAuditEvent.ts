@@ -29,9 +29,20 @@ export function collectAuditEventUserIds(event: AuditEvent): string[] {
   const ids: (string | null | undefined)[] = [event.actor_id]
   const newData = event.new_data as Record<string, unknown> | null
   const oldData = event.old_data as Record<string, unknown> | null
-  if (event.entity_type === 'project_members' || event.entity_type === 'project_access_requests') {
+  if (event.entity_type === 'project_members' || event.entity_type === 'project_access_requests' || event.entity_type === 'task_assignees') {
     ids.push(readString(newData, 'user_id'), readString(oldData, 'user_id'))
   }
+  return ids.filter((id): id is string => !!id)
+}
+
+// task_assignees audit rows only carry task_id, not the task's title — the
+// caller resolves these the same way it resolves user ids (a small separate
+// lookup), and passes the result in via getTaskTitle.
+export function collectAuditEventTaskIds(event: AuditEvent): string[] {
+  if (event.entity_type !== 'task_assignees') return []
+  const newData = event.new_data as Record<string, unknown> | null
+  const oldData = event.old_data as Record<string, unknown> | null
+  const ids = [readString(newData, 'task_id'), readString(oldData, 'task_id')]
   return ids.filter((id): id is string => !!id)
 }
 
@@ -44,7 +55,7 @@ function truncate(text: string, max: number): string {
   return text.length > max ? text.slice(0, max - 1) + '…' : text
 }
 
-export function formatAuditEvent(event: AuditEvent, getName: NameResolver): FormattedAuditEvent {
+export function formatAuditEvent(event: AuditEvent, getName: NameResolver, getTaskTitle: NameResolver = () => 'a task'): FormattedAuditEvent {
   const actor = getName(event.actor_id)
   const newData = event.new_data as Record<string, unknown> | null
   const oldData = event.old_data as Record<string, unknown> | null
@@ -56,6 +67,8 @@ export function formatAuditEvent(event: AuditEvent, getName: NameResolver): Form
       return formatTaskEvent(event, actor, oldData, newData)
     case 'task_comments':
       return formatTaskCommentEvent(event, actor, newData)
+    case 'task_assignees':
+      return formatTaskAssigneeEvent(event, actor, getName, getTaskTitle, oldData, newData)
     case 'project_members':
       return formatProjectMemberEvent(event, actor, getName, oldData, newData)
     case 'project_invites':
@@ -65,6 +78,24 @@ export function formatAuditEvent(event: AuditEvent, getName: NameResolver): Form
     default:
       return { title: `${actor} performed ${event.action.toLowerCase()} on ${event.entity_type}`, detail: null, category: 'other' }
   }
+}
+
+function formatTaskAssigneeEvent(
+  event: AuditEvent, actor: string, getName: NameResolver, getTaskTitle: NameResolver,
+  oldData: Record<string, unknown> | null, newData: Record<string, unknown> | null
+): FormattedAuditEvent {
+  const targetId = readString(newData, 'user_id') ?? readString(oldData, 'user_id')
+  const target = getName(targetId)
+  const taskId = readString(newData, 'task_id') ?? readString(oldData, 'task_id')
+  const taskTitle = getTaskTitle(taskId)
+
+  if (event.action === 'INSERT') {
+    return { title: `${actor} assigned ${target} to "${taskTitle}"`, detail: null, category: 'tasks' }
+  }
+  if (event.action === 'DELETE') {
+    return { title: `${actor} removed ${target} from "${taskTitle}"`, detail: null, category: 'tasks' }
+  }
+  return { title: `${actor} updated an assignment on "${taskTitle}"`, detail: null, category: 'tasks' }
 }
 
 function formatProjectEvent(

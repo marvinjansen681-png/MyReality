@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils/cn'
 import EmptyState from '@/components/shared/EmptyState'
 import PriorityBadge from '@/components/shared/PriorityBadge'
+import AssigneeAvatars from '@/components/shared/AssigneeAvatars'
+import { getDueDateStatus } from '@/lib/utils/dueDate'
 import { canEditProjectContent } from '@/lib/permissions/projectPermissions'
 import TaskDetail from './TaskDetail'
 import type { Task, Column, Profile, ProjectRole } from '@/types'
@@ -17,15 +19,19 @@ interface ListViewProps {
   columns: Column[]
   userId: string
   userProfile: Profile | null
+  profileMap?: Record<string, Profile>
+  assigneesMap?: Record<string, string[]>
+  myTasksOnly?: boolean
   projectRole?: ProjectRole | null
 }
 
-export default function ListView({ initialTasks, columns, userId, userProfile, projectRole = null }: ListViewProps) {
+export default function ListView({ initialTasks, columns, userId, userProfile, profileMap, assigneesMap, myTasksOnly = false, projectRole = null }: ListViewProps) {
   const [tasks, setTasks] = useState(initialTasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const canEdit = canEditProjectContent(projectRole)
 
   const colMap = Object.fromEntries(columns.map(c => [c.id, c.title]))
+  const visibleTasks = tasks.filter(t => !myTasksOnly || (assigneesMap?.[t.id] ?? []).includes(userId))
 
   async function toggleDone(task: Task) {
     if (!canEdit) return
@@ -54,10 +60,11 @@ export default function ListView({ initialTasks, columns, userId, userProfile, p
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Column</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Due</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Labels</th>
+              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Assignees</th>
             </tr>
           </thead>
           <tbody>
-            {tasks.map(task => (
+            {visibleTasks.map(task => (
               <tr
                 key={task.id}
                 className="border-b border-[var(--border)] hover:bg-hover transition-colors group cursor-pointer"
@@ -84,7 +91,12 @@ export default function ListView({ initialTasks, columns, userId, userProfile, p
                 <td className="py-2.5 px-3 text-xs text-secondary">
                   {task.column_id ? colMap[task.column_id] ?? '—' : '—'}
                 </td>
-                <td className="py-2.5 px-3 text-xs text-muted">
+                <td className={cn(
+                  'py-2.5 px-3 text-xs',
+                  getDueDateStatus(task.due_date, task.status) === 'overdue' ? 'text-red'
+                    : getDueDateStatus(task.due_date, task.status) === 'today' ? 'text-gold'
+                    : 'text-muted'
+                )}>
                   {task.due_date ? format(parseISO(task.due_date), 'MMM d') : '—'}
                 </td>
                 <td className="py-2.5 px-3">
@@ -94,18 +106,21 @@ export default function ListView({ initialTasks, columns, userId, userProfile, p
                     ))}
                   </div>
                 </td>
+                <td className="py-2.5 px-3">
+                  {profileMap && <AssigneeAvatars ids={assigneesMap?.[task.id] ?? []} profileMap={profileMap} />}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {tasks.length === 0 && (
+        {visibleTasks.length === 0 && (
           <EmptyState icon={ListTodo} title="No tasks here" description="No tasks in this project yet." />
         )}
       </div>
 
       {/* Mobile cards */}
       <div className="lg:hidden space-y-2">
-        {tasks.map(task => (
+        {visibleTasks.map(task => (
           <div
             key={task.id}
             className="bg-card border border-[var(--border)] rounded-lg p-3 cursor-pointer hover:border-[var(--border-focus)] transition-colors"
@@ -128,17 +143,25 @@ export default function ListView({ initialTasks, columns, userId, userProfile, p
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <PriorityBadge priority={task.priority} />
                   {task.due_date && (
-                    <span className="text-xs text-muted">{format(parseISO(task.due_date), 'MMM d')}</span>
+                    <span className={cn(
+                      'text-xs',
+                      getDueDateStatus(task.due_date, task.status) === 'overdue' ? 'text-red'
+                        : getDueDateStatus(task.due_date, task.status) === 'today' ? 'text-gold'
+                        : 'text-muted'
+                    )}>
+                      {format(parseISO(task.due_date), 'MMM d')}
+                    </span>
                   )}
                   {task.column_id && (
                     <span className="text-xs text-muted">{colMap[task.column_id]}</span>
                   )}
+                  {profileMap && <AssigneeAvatars ids={assigneesMap?.[task.id] ?? []} profileMap={profileMap} />}
                 </div>
               </div>
             </div>
           </div>
         ))}
-        {tasks.length === 0 && (
+        {visibleTasks.length === 0 && (
           <EmptyState icon={ListTodo} title="No tasks here" description="No tasks in this project yet." />
         )}
       </div>
@@ -147,6 +170,7 @@ export default function ListView({ initialTasks, columns, userId, userProfile, p
         task={activeTask}
         userId={userId}
         userProfile={userProfile}
+        projectRole={projectRole}
         onClose={() => setActiveTask(null)}
         onUpdated={handleUpdated}
       />

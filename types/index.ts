@@ -5,7 +5,7 @@ export type TaskPriority = 'none' | 'low' | 'medium' | 'high' | 'urgent'
 export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done'
 export type VisionCategory = 'Faith' | 'Business' | 'Finance' | 'Family' | 'Health' | 'Personal'
 export type VisionStatus = 'active' | 'achieved' | 'paused'
-export type NotificationType = 'task_assigned' | 'task_commented' | 'task_due' | 'mention' | 'vision_due'
+export type NotificationType = 'task_assigned' | 'task_commented' | 'task_due' | 'mention' | 'vision_due' | 'access_request_approved' | 'access_request_rejected'
 export type ActivityAction = 'created' | 'updated' | 'commented' | 'assigned' | 'moved' | 'completed' | 'reopened'
 export type ProjectRole = 'owner' | 'manager' | 'editor' | 'commenter' | 'viewer'
 export type ProjectMemberStatus = 'active' | 'removed' | 'pending'
@@ -98,6 +98,16 @@ export interface ProjectAccessRequest {
   reviewed_by: string | null
   reviewed_at: string | null
   review_note: string | null
+  profile?: Profile
+}
+
+export interface TaskAssignee {
+  id: string
+  task_id: string
+  project_id: string
+  user_id: string
+  assigned_by: string | null
+  assigned_at: string
   profile?: Profile
 }
 

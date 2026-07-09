@@ -5,9 +5,11 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { motion } from 'framer-motion'
 import { Calendar, MessageSquare, MoreVertical } from 'lucide-react'
-import { format, parseISO, isPast, isToday } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { cn } from '@/lib/utils/cn'
+import { getDueDateStatus } from '@/lib/utils/dueDate'
 import PriorityBadge from '@/components/shared/PriorityBadge'
+import AssigneeAvatars from '@/components/shared/AssigneeAvatars'
 import type { Task, Profile } from '@/types'
 
 interface TaskCardProps {
@@ -16,15 +18,18 @@ interface TaskCardProps {
   onMoveToColumn?: (task: Task, columnId: string) => void
   columns?: { id: string; title: string }[]
   profileMap?: Record<string, Profile>
+  assigneeIds?: string[]
   index?: number
 }
 
-const TaskCard = memo(function TaskCard({ task, onClick, onMoveToColumn, columns, profileMap, index = 0 }: TaskCardProps) {
+const TaskCard = memo(function TaskCard({ task, onClick, onMoveToColumn, columns, profileMap, assigneeIds, index = 0 }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
 
   const isDone = task.status === 'done'
-  const isOverdue = task.due_date && !isDone && isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date))
-  const isDueToday = task.due_date && isToday(parseISO(task.due_date))
+  const dueStatus = getDueDateStatus(task.due_date, task.status)
+  const isOverdue = dueStatus === 'overdue'
+  const isDueToday = dueStatus === 'today'
+  const ids = assigneeIds ?? task.assigned_to ?? []
 
   return (
     <motion.div
@@ -77,30 +82,9 @@ const TaskCard = memo(function TaskCard({ task, onClick, onMoveToColumn, columns
         )}
 
         {/* Assignee avatars */}
-        {profileMap && task.assigned_to?.length > 0 && (
-          <div className="ml-auto flex items-center -space-x-1.5">
-            {task.assigned_to.slice(0, 3).map(uid => {
-              const p = profileMap[uid]
-              if (!p) return null
-              const initials = (p.full_name ?? p.email ?? '?').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
-              return (
-                <div
-                  key={uid}
-                  title={p.full_name ?? p.email ?? uid}
-                  className="w-5 h-5 rounded-full bg-[var(--gold-muted)] border border-[var(--bg-surface)] flex items-center justify-center text-[8px] font-bold text-gold overflow-hidden flex-shrink-0"
-                >
-                  {p.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.avatar_url} alt={p.full_name ?? ''} className="w-full h-full object-cover" />
-                  ) : initials}
-                </div>
-              )
-            })}
-            {task.assigned_to.length > 3 && (
-              <div className="w-5 h-5 rounded-full bg-hover border border-[var(--bg-surface)] flex items-center justify-center text-[8px] text-muted flex-shrink-0">
-                +{task.assigned_to.length - 3}
-              </div>
-            )}
+        {profileMap && ids.length > 0 && (
+          <div className="ml-auto">
+            <AssigneeAvatars ids={ids} profileMap={profileMap} />
           </div>
         )}
 

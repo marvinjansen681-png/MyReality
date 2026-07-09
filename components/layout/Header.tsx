@@ -28,6 +28,8 @@ const NOTIF_ICONS: Record<string, string> = {
   task_due: '⏰',
   mention: '@',
   vision_due: '✨',
+  access_request_approved: '✅',
+  access_request_rejected: '⛔',
 }
 
 interface HeaderProps {

@@ -4,15 +4,19 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { X, Calendar, Flag, Clock, Tag, Plus, Loader2, Send, Activity } from 'lucide-react'
+import { X, Calendar, Flag, Tag, Plus, Loader2, Send, Activity, Users } from 'lucide-react'
 import { format, parseISO, formatDistanceToNow } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils/cn'
-import { logActivity, insertNotification } from '@/lib/utils/activity'
+import { logActivity } from '@/lib/utils/activity'
+import { fetchProfilesByIds } from '@/lib/utils/profiles'
+import { parseMentions } from '@/lib/utils/mentions'
+import { canEditTaskMetadata, canAssignTask, canCommentOnProject } from '@/lib/permissions/projectPermissions'
 import SubtaskList from '@/components/tasks/SubtaskList'
 import PriorityBadge from '@/components/shared/PriorityBadge'
-import type { Task, TaskComment, TaskActivity, TaskPriority, Profile } from '@/types'
+import TaskAssigneesPanel from '@/components/projects/TaskAssigneesPanel'
+import type { Task, TaskComment, TaskActivity, TaskPriority, Profile, ProjectRole } from '@/types'
 
 const PRIORITIES: TaskPriority[] = ['none', 'low', 'medium', 'high', 'urgent']
 const PRIORITY_LABELS: Record<TaskPriority, string> = {
@@ -23,11 +27,12 @@ interface TaskDetailProps {
   task: Task | null
   userId: string
   userProfile: Profile | null
+  projectRole?: ProjectRole | null
   onClose: () => void
   onUpdated: (task: Task) => void
 }
 
-export default function TaskDetail({ task, userId, userProfile, onClose, onUpdated }: TaskDetailProps) {
+export default function TaskDetail({ task, userId, userProfile, projectRole = null, onClose, onUpdated }: TaskDetailProps) {
   const [title, setTitle] = useState('')
   const [priority, setPriority] = useState<TaskPriority>('none')
   const [dueDate, setDueDate] = useState('')
@@ -37,12 +42,19 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
   const [subtasks, setSubtasks] = useState<Task[]>([])
   const [comments, setComments] = useState<TaskComment[]>([])
   const [activity, setActivity] = useState<TaskActivity[]>([])
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([])
+  const [activeMemberIds, setActiveMemberIds] = useState<Set<string>>(new Set())
+  const [peopleMap, setPeopleMap] = useState<Record<string, Profile>>({})
   const [commentText, setCommentText] = useState('')
   const [sendingComment, setSendingComment] = useState(false)
   const [saving, setSaving] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const labelInputRef = useRef<HTMLInputElement>(null)
   const commentsEndRef = useRef<HTMLDivElement>(null)
+
+  const canEditMeta = canEditTaskMetadata(projectRole)
+  const canAssign = canAssignTask(projectRole)
+  const canComment = canCommentOnProject(projectRole)
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -80,14 +92,36 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
   async function loadTaskData() {
     if (!task) return
     const supabase = createClient()
-    const [subtasksRes, commentsRes, activityRes] = await Promise.all([
+    const [subtasksRes, commentsRes, activityRes, assigneesRes, membersRes] = await Promise.all([
       supabase.from('tasks').select('*').eq('parent_task_id', task.id).order('position'),
-      supabase.from('task_comments').select('*, profile:profiles!task_comments_user_id_fkey(full_name, avatar_url)').eq('task_id', task.id).order('created_at'),
-      supabase.from('task_activity').select('*, profile:profiles!task_activity_user_id_fkey(full_name)').eq('task_id', task.id).order('created_at', { ascending: false }).limit(20),
+      supabase.from('task_comments').select('*').eq('task_id', task.id).order('created_at'),
+      supabase.from('task_activity').select('*').eq('task_id', task.id).order('created_at', { ascending: false }).limit(20),
+      task.project_id
+        ? supabase.from('task_assignees').select('user_id').eq('task_id', task.id)
+        : Promise.resolve({ data: [] as { user_id: string }[] }),
+      task.project_id
+        ? supabase.from('project_members').select('user_id').eq('project_id', task.project_id).eq('status', 'active')
+        : Promise.resolve({ data: [] as { user_id: string }[] }),
     ])
     if (subtasksRes.data) setSubtasks(subtasksRes.data as Task[])
-    if (commentsRes.data) setComments(commentsRes.data as TaskComment[])
-    if (activityRes.data) setActivity(activityRes.data as TaskActivity[])
+    const commentRows = (commentsRes.data ?? []) as TaskComment[]
+    const activityRows = (activityRes.data ?? []) as TaskActivity[]
+    setComments(commentRows)
+    setActivity(activityRows)
+
+    const assigneeUserIds = ((assigneesRes.data ?? []) as { user_id: string }[]).map(r => r.user_id)
+    setAssigneeIds(assigneeUserIds)
+    const activeIds = new Set(((membersRes.data ?? []) as { user_id: string }[]).map(r => r.user_id))
+    setActiveMemberIds(activeIds)
+
+    const allIds = [
+      ...commentRows.map(c => c.user_id),
+      ...activityRows.map(a => a.user_id),
+      ...assigneeUserIds,
+      ...Array.from(activeIds),
+    ]
+    const profiles = await fetchProfilesByIds(supabase, allIds)
+    setPeopleMap(profiles)
   }
 
   const scheduleAutoSave = useCallback(() => {
@@ -112,49 +146,54 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
     setSaving(false)
     if (error) { toast.error('Failed to save'); return }
     onUpdated(data as Task)
+  }
 
-    // Notify newly assigned users
-    if (overrides.assigned_to) {
-      const prevAssigned = task.assigned_to ?? []
-      const newAssigned = (overrides.assigned_to as string[]) ?? []
-      const added = newAssigned.filter(id => !prevAssigned.includes(id) && id !== userId)
-      for (const assigneeId of added) {
-        await insertNotification({
-          userId: assigneeId,
-          type: 'task_assigned',
-          title: `You were assigned to "${(overrides.title ?? title)}"`,
-          body: `Assigned by ${userProfile?.full_name ?? 'someone'}`,
-          link: task.project_id ? `/projects/${task.project_id}` : undefined,
-        })
-      }
+  async function handleAssign(assigneeId: string) {
+    if (!task) return
+    const supabase = createClient()
+    const { error } = await supabase.from('task_assignees').insert({ task_id: task.id, user_id: assigneeId })
+    if (error) { toast.error('Failed to assign'); return }
+    setAssigneeIds(prev => prev.includes(assigneeId) ? prev : [...prev, assigneeId])
+    if (!peopleMap[assigneeId]) {
+      const p = await fetchProfilesByIds(supabase, [assigneeId])
+      setPeopleMap(prev => ({ ...prev, ...p }))
     }
   }
 
+  async function handleUnassign(assigneeId: string) {
+    if (!task) return
+    const supabase = createClient()
+    const { error } = await supabase.from('task_assignees').delete().eq('task_id', task.id).eq('user_id', assigneeId)
+    if (error) { toast.error('Failed to unassign'); return }
+    setAssigneeIds(prev => prev.filter(id => id !== assigneeId))
+  }
+
   async function sendComment() {
-    if (!commentText.trim() || !task) return
+    if (!commentText.trim() || !task || !canComment) return
     setSendingComment(true)
     const supabase = createClient()
+    const content = commentText.trim()
     const { data, error } = await supabase
       .from('task_comments')
-      .insert({ task_id: task.id, user_id: userId, content: commentText.trim() })
-      .select('*, profile:profiles!task_comments_user_id_fkey(full_name, avatar_url)')
+      .insert({ task_id: task.id, user_id: userId, content })
+      .select('*')
       .single()
     setSendingComment(false)
     if (error) { toast.error('Failed to send comment'); return }
-    setComments(prev => [...prev, data as TaskComment])
+    const inserted = data as TaskComment
+    setComments(prev => [...prev, inserted])
     setCommentText('')
     setTimeout(() => commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
 
-    // Log activity + notify task creator if different user
-    await logActivity(task.id, userId, 'commented', { preview: commentText.trim().slice(0, 80) })
-    if (task.created_by !== userId) {
-      await insertNotification({
-        userId: task.created_by,
-        type: 'task_commented',
-        title: `New comment on "${task.title}"`,
-        body: `${userProfile?.full_name ?? 'Someone'}: ${commentText.trim().slice(0, 100)}`,
-        link: task.project_id ? `/projects/${task.project_id}` : undefined,
-      })
+    await logActivity(task.id, userId, 'commented', { preview: content.slice(0, 80) })
+
+    // Mentions: match against active project members only. The RPC
+    // independently re-validates membership server-side, so this is just
+    // client-side detection, not the trust boundary.
+    const mentionCandidates = Array.from(activeMemberIds).map(id => peopleMap[id]).filter((p): p is Profile => !!p)
+    const mentionedIds = parseMentions(content, mentionCandidates)
+    if (mentionedIds.length > 0) {
+      await supabase.rpc('create_mention_notifications', { comment_id_input: inserted.id, mentioned_user_ids: mentionedIds })
     }
   }
 
@@ -233,8 +272,9 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
                     <label className="text-xs text-muted mb-1.5 flex items-center gap-1 block"><Flag size={11} /> Priority</label>
                     <select
                       value={priority}
+                      disabled={!canEditMeta}
                       onChange={e => { const p = e.target.value as TaskPriority; setPriority(p); saveField({ priority: p }) }}
-                      className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-md px-2.5 py-2 text-xs text-primary focus:outline-none focus:border-[var(--border-focus)]"
+                      className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-md px-2.5 py-2 text-xs text-primary focus:outline-none focus:border-[var(--border-focus)] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {PRIORITIES.map(p => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}
                     </select>
@@ -244,11 +284,27 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
                     <input
                       type="date"
                       value={dueDate}
+                      disabled={!canEditMeta}
                       onChange={e => { setDueDate(e.target.value); saveField({ due_date: e.target.value || null }) }}
-                      className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-md px-2.5 py-2 text-xs text-primary focus:outline-none focus:border-[var(--border-focus)]"
+                      className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-md px-2.5 py-2 text-xs text-primary focus:outline-none focus:border-[var(--border-focus)] disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
+
+                {/* Assignees */}
+                {task.project_id && (
+                  <div>
+                    <label className="text-xs text-muted mb-2 flex items-center gap-1 block"><Users size={11} /> Assignees</label>
+                    <TaskAssigneesPanel
+                      assigneeIds={assigneeIds}
+                      profileMap={peopleMap}
+                      activeMemberIds={activeMemberIds}
+                      canAssign={canAssign}
+                      onAssign={handleAssign}
+                      onUnassign={handleUnassign}
+                    />
+                  </div>
+                )}
 
                 {/* Labels */}
                 <div>
@@ -299,11 +355,11 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
                     {comments.map(c => (
                       <div key={c.id} className="flex gap-3">
                         <div className="w-7 h-7 rounded-full bg-hover flex items-center justify-center text-xs font-semibold text-secondary flex-shrink-0">
-                          {(c.profile as Profile | undefined)?.full_name?.charAt(0) ?? '?'}
+                          {(peopleMap[c.user_id]?.full_name ?? peopleMap[c.user_id]?.email ?? '?').charAt(0)}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-baseline gap-2 mb-0.5">
-                            <span className="text-xs font-semibold text-primary">{(c.profile as Profile | undefined)?.full_name ?? 'User'}</span>
+                            <span className="text-xs font-semibold text-primary">{peopleMap[c.user_id]?.full_name ?? peopleMap[c.user_id]?.email ?? 'User'}</span>
                             <span className="text-[10px] text-muted">{formatDistanceToNow(parseISO(c.created_at), { addSuffix: true })}</span>
                           </div>
                           <p className="text-sm text-secondary leading-relaxed">{c.content}</p>
@@ -323,7 +379,7 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
                         <div key={a.id} className="flex items-start gap-2">
                           <div className="w-1.5 h-1.5 rounded-full bg-[var(--border)] mt-1.5 flex-shrink-0" />
                           <p className="text-xs text-muted leading-relaxed">
-                            <span className="text-secondary">{(a.profile as Profile | undefined)?.full_name ?? 'Someone'}</span>
+                            <span className="text-secondary">{peopleMap[a.user_id]?.full_name ?? peopleMap[a.user_id]?.email ?? 'Someone'}</span>
                             {' '}{ACTION_LABELS[a.action] ?? a.action}
                             {' · '}{formatDistanceToNow(parseISO(a.created_at), { addSuffix: true })}
                           </p>
@@ -343,20 +399,26 @@ export default function TaskDetail({ task, userId, userProfile, onClose, onUpdat
               <div className="w-7 h-7 rounded-full bg-hover flex items-center justify-center text-xs font-semibold text-secondary flex-shrink-0">
                 {userProfile?.full_name?.charAt(0) ?? '?'}
               </div>
-              <input
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment() } }}
-                placeholder="Add a comment..."
-                className="flex-1 bg-[var(--bg-surface)] border border-[var(--border)] rounded-full px-4 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--border-focus)] transition-colors"
-              />
-              <button
-                onClick={sendComment}
-                disabled={!commentText.trim() || sendingComment}
-                className="w-8 h-8 flex items-center justify-center bg-gold text-black rounded-full disabled:opacity-40 hover:bg-gold-light transition-colors flex-shrink-0"
-              >
-                {sendingComment ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-              </button>
+              {canComment ? (
+                <>
+                  <input
+                    value={commentText}
+                    onChange={e => setCommentText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment() } }}
+                    placeholder="Add a comment... (@name to mention)"
+                    className="flex-1 bg-[var(--bg-surface)] border border-[var(--border)] rounded-full px-4 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--border-focus)] transition-colors"
+                  />
+                  <button
+                    onClick={sendComment}
+                    disabled={!commentText.trim() || sendingComment}
+                    className="w-8 h-8 flex items-center justify-center bg-gold text-black rounded-full disabled:opacity-40 hover:bg-gold-light transition-colors flex-shrink-0"
+                  >
+                    {sendingComment ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  </button>
+                </>
+              ) : (
+                <p className="text-xs text-muted flex-1">You don&apos;t have permission to comment on this project.</p>
+              )}
             </div>
           </motion.div>
         </>

@@ -22,10 +22,12 @@ interface BoardViewProps {
   userProfile: Profile | null
   projectId: string
   profileMap?: Record<string, Profile>
+  assigneesMap?: Record<string, string[]>
+  myTasksOnly?: boolean
   projectRole?: ProjectRole | null
 }
 
-export default function BoardView({ columns, initialTasks, userId, userProfile, projectId, profileMap, projectRole = null }: BoardViewProps) {
+export default function BoardView({ columns, initialTasks, userId, userProfile, projectId, profileMap, assigneesMap, myTasksOnly = false, projectRole = null }: BoardViewProps) {
   const [tasks, setTasks] = useState(initialTasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [dragging, setDragging] = useState<Task | null>(null)
@@ -55,7 +57,10 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
   )
 
   function getColumnTasks(columnId: string) {
-    return tasks.filter(t => t.column_id === columnId).sort((a, b) => a.position - b.position)
+    return tasks
+      .filter(t => t.column_id === columnId)
+      .filter(t => !myTasksOnly || (assigneesMap?.[t.id] ?? []).includes(userId))
+      .sort((a, b) => a.position - b.position)
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -167,6 +172,7 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
               onAddTask={addTask}
               onMoveTask={moveTask}
               profileMap={profileMap}
+              assigneesMap={assigneesMap}
               canEdit={canEdit}
             />
           ))}
@@ -175,12 +181,13 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
         {/* Mobile: tab per column */}
         <MobileColumnTabs
           columns={columns}
-          tasks={tasks}
+          tasks={tasks.filter(t => !myTasksOnly || (assigneesMap?.[t.id] ?? []).includes(userId))}
           colMeta={colMeta}
           onTaskClick={setActiveTask}
           onAddTask={addTask}
           onMoveTask={moveTask}
           profileMap={profileMap}
+          assigneesMap={assigneesMap}
           canEdit={canEdit}
         />
 
@@ -197,6 +204,7 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
         task={activeTask}
         userId={userId}
         userProfile={userProfile}
+        projectRole={projectRole}
         onClose={() => setActiveTask(null)}
         onUpdated={handleUpdated}
       />
@@ -214,7 +222,7 @@ function columnStatusMap(columnId: string, columns: Column[]): Task['status'] {
   return 'todo'
 }
 
-function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onMoveTask, profileMap, canEdit }: {
+function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onMoveTask, profileMap, assigneesMap, canEdit }: {
   columns: Column[]
   tasks: Task[]
   colMeta: { id: string; title: string }[]
@@ -222,6 +230,7 @@ function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onM
   onAddTask: (colId: string, title: string) => void
   onMoveTask: (t: Task, colId: string) => void
   profileMap?: Record<string, Profile>
+  assigneesMap?: Record<string, string[]>
   canEdit: boolean
 }) {
   const [activeColIdx, setActiveColIdx] = useState(0)
@@ -260,6 +269,7 @@ function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onM
             onMoveToColumn={onMoveTask}
             columns={colMeta}
             profileMap={profileMap}
+            assigneeIds={assigneesMap?.[task.id]}
             index={i}
           />
         ))}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, LayoutGrid, List, ArrowLeft, Share2, History } from 'lucide-react'
+import { Loader2, LayoutGrid, List, ArrowLeft, Share2, History, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import { canManageInvites, canViewAuditTrail } from '@/lib/permissions/projectPermissions'
@@ -25,6 +25,8 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [assigneesMap, setAssigneesMap] = useState<Record<string, string[]>>({})
+  const [myTasksOnly, setMyTasksOnly] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -34,13 +36,14 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       if (!user) return
       setUserId(user.id)
 
-      const [profileRes, memberRes, projectRes, columnsRes, tasksRes, roleRes] = await Promise.all([
+      const [profileRes, memberRes, projectRes, columnsRes, tasksRes, roleRes, assigneesRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('workspace_members').select('workspace_id').eq('user_id', user.id).single(),
         supabase.from('projects').select('*').eq('id', params.id).single(),
         supabase.from('columns').select('*').eq('project_id', params.id).order('position'),
         supabase.from('tasks').select('*').eq('project_id', params.id).eq('is_personal', false).is('parent_task_id', null).order('position'),
         supabase.from('project_members').select('role').eq('project_id', params.id).eq('user_id', user.id).eq('status', 'active').maybeSingle(),
+        supabase.from('task_assignees').select('task_id, user_id').eq('project_id', params.id),
       ])
 
       if (roleRes.data) setProjectRole(roleRes.data.role as ProjectRole)
@@ -60,9 +63,52 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       setProject(projectRes.data as Project)
       setColumns((columnsRes.data ?? []) as Column[])
       setTasks((tasksRes.data ?? []) as Task[])
+
+      const map: Record<string, string[]> = {}
+      for (const row of (assigneesRes.data ?? []) as { task_id: string; user_id: string }[]) {
+        map[row.task_id] = [...(map[row.task_id] ?? []), row.user_id]
+      }
+      setAssigneesMap(map)
+
       setLoading(false)
     }
     load()
+  }, [params.id])
+
+  // Realtime: keep the assignees map in sync without requiring a refresh.
+  // Separate channel from the task-focused useRealtime hook used inside
+  // BoardView — doesn't touch that hook at all.
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`project:${params.id}:task_assignees`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'task_assignees', filter: `project_id=eq.${params.id}` },
+        (payload) => {
+          const row = payload.new as { task_id: string; user_id: string }
+          setAssigneesMap(prev => {
+            const existing = prev[row.task_id] ?? []
+            if (existing.includes(row.user_id)) return prev
+            return { ...prev, [row.task_id]: [...existing, row.user_id] }
+          })
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'task_assignees', filter: `project_id=eq.${params.id}` },
+        (payload) => {
+          const row = payload.old as { task_id?: string; user_id?: string }
+          if (!row.task_id || !row.user_id) return
+          setAssigneesMap(prev => {
+            if (!prev[row.task_id as string]) return prev
+            return { ...prev, [row.task_id as string]: prev[row.task_id as string].filter(id => id !== row.user_id) }
+          })
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [params.id])
 
   if (loading) {
@@ -109,6 +155,19 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
             <span className="hidden sm:inline">Share</span>
           </button>
         )}
+        {/* My tasks toggle */}
+        {view !== 'activity' && (
+          <button
+            onClick={() => setMyTasksOnly(v => !v)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors flex-shrink-0 min-h-[40px]',
+              myTasksOnly ? 'bg-gold text-black' : 'text-secondary hover:text-primary hover:bg-hover'
+            )}
+          >
+            <User size={15} />
+            <span className="hidden sm:inline">My tasks</span>
+          </button>
+        )}
         {/* View toggle */}
         <div className="flex items-center bg-hover rounded-lg p-1 gap-1 flex-shrink-0">
           <button
@@ -143,6 +202,8 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           userProfile={userProfile}
           projectId={params.id}
           profileMap={profileMap}
+          assigneesMap={assigneesMap}
+          myTasksOnly={myTasksOnly}
           projectRole={projectRole}
         />
       )}
@@ -152,6 +213,9 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           columns={columns}
           userId={userId ?? ''}
           userProfile={userProfile}
+          profileMap={profileMap}
+          assigneesMap={assigneesMap}
+          myTasksOnly={myTasksOnly}
           projectRole={projectRole}
         />
       )}

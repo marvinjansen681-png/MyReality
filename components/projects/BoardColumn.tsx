@@ -16,10 +16,11 @@ interface BoardColumnProps {
   onAddTask: (columnId: string, title: string) => void
   onMoveTask: (task: Task, columnId: string) => void
   profileMap?: Record<string, Profile>
+  assigneesMap?: Record<string, string[]>
   canEdit?: boolean
 }
 
-export default function BoardColumn({ column, tasks, allColumns, onTaskClick, onAddTask, onMoveTask, profileMap, canEdit = true }: BoardColumnProps) {
+export default function BoardColumn({ column, tasks, allColumns, onTaskClick, onAddTask, onMoveTask, profileMap, assigneesMap, canEdit = true }: BoardColumnProps) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -75,6 +76,7 @@ export default function BoardColumn({ column, tasks, allColumns, onTaskClick, on
               onMoveToColumn={onMoveTask}
               columns={allColumns}
               profileMap={profileMap}
+              assigneeIds={assigneesMap?.[task.id]}
               index={i}
             />
           ))}

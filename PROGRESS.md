@@ -7,24 +7,29 @@
 ## ▶️ CURRENT STATUS
 
 ```
-NEXT STEP TO BUILD:  None requested yet. Steps 21A, 21A.1, 21B, 21C, and
-                     21C.1 are all complete and fully verified live.
+NEXT STEP TO BUILD:  None requested yet. Steps 21A through 21D are all
+                     complete and verified live. One small follow-up
+                     migration (027) is written but not yet applied — see
+                     below, it does not block Step 21D's own correctness.
 OVERALL PROGRESS:    20 of 20 original steps + Step 21A + 21A.1 + 21B + 21C +
-                     21C.1, all complete and fully verified live.
-LAST COMMIT:         8cb0ab2 (Step 21B, pushed) — Step 21C and 21C.1 not yet
-                     committed/pushed, see below.
+                     21C.1 + 21D, all complete and verified live.
+LAST COMMIT:         see session log — Step 21D committed and pushed this
+                     session.
 APP STATUS:          npm run lint ✅ · npx tsc --noEmit ✅ · npm run build ✅ zero errors
-                     ✅ Step 21C.1 (audit retention cleanup for hard-deleted projects)
-                     built, migration 025 applied by Marvin and verified live — 25/25
-                     checks passing. Resolves Known Issue #11 by product decision:
-                     archiving keeps full audit history (unaffected, it's an UPDATE not
-                     a delete, confirmed live); hard delete now purges that project's
-                     audit history (confirmed: zero rows remain tied to a hard-deleted
-                     project_id, zero new invisible orphans created) and logs exactly
-                     one workspace-level HARD_DELETE marker, confirmed visible to the
-                     workspace owner and confirmed NOT visible to an unrelated user.
-                     audit_events RLS was extended narrowly (one extra OR clause for
-                     that marker only) — the core owner/manager policy is unchanged.
+                     ✅ Step 21D (task assignment, mentions, notifications, My Tasks)
+                     built, migration 026 applied by Marvin, live-verified —
+                     43/48 checks passed on the first pass; the 5 "failures" were
+                     all a flaw in the test script's own baseline assumptions
+                     except one genuine finding: hard-deleting a project whose
+                     tasks had comments left 3 invisible orphan audit_events rows,
+                     a second-level version of the exact Known Issue #11 problem
+                     21C.1 was meant to fully close. Root-caused, fixed in migration
+                     027, and the orphan rows + test notifications were cleaned up
+                     by exact id. Migration 027 is written and reviewed but NOT YET
+                     APPLIED to live Supabase — needs Marvin to run it. It is a
+                     narrow, non-security cleanliness fix; nothing in Step 21D's
+                     actual requested behavior (assignment, permissions, mentions,
+                     notifications, My Tasks, Activity tab) depends on it.
 ```
 
 ---
@@ -57,7 +62,8 @@ APP STATUS:          npm run lint ✅ · npx tsc --noEmit ✅ · npm run build �
 | 21A.1 | Project Archive/Delete Policy Hardening | ✅ Complete, verified live | step-21a-1 | Archive fields, owner-only archive/restore/delete trigger+policy, resolves Known Issue #6 |
 | 21B | Project Invite + Approval UI | ✅ Complete, verified live | step-21b | Invite links, approval flow, member management, migrations 022+023 |
 | 21C | Project Audit Trail + Activity Visibility | ✅ Complete, verified live | step-21c | Activity tab, human-readable formatting, migration 024 (profiles visibility fix) |
-| 21C.1 | Audit Retention Cleanup for Hard-Deleted Projects | ✅ Complete, verified live | (uncommitted) | Migration 025 — resolves Known Issue #11, hard-delete purges project audit history + workspace-level HARD_DELETE marker, 25/25 checks passing |
+| 21C.1 | Audit Retention Cleanup for Hard-Deleted Projects | ✅ Complete, verified live | 6728353 | Migration 025 — resolves Known Issue #11, hard-delete purges project audit history + workspace-level HARD_DELETE marker, 25/25 checks passing |
+| 21D | Practical Collaboration Tools | ✅ Complete, verified live | (see session log) | Migration 026 — task assignment, mentions, notification fixes, My Tasks filter, 43/48 checks passing + 1 follow-up fix (migration 027, not yet applied) |
 
 **Status icons:**
 ⬜ Not started | 🔄 In progress | ✅ Complete | ❌ Blocked
@@ -1226,6 +1232,263 @@ BOTTOM LINE
 
 ---
 
+### Step 21D — Practical Collaboration Tools
+```
+Status:     ✅ Complete — migration 026 applied by Marvin, live-verified
+Started:    2026-07-09
+Completed:  2026-07-09
+
+GOAL
+  Make the collaboration system practically usable for 6-10 people working
+  on the same project: task assignment, due date/priority polish, @mentions
+  in comments, real notifications, and a "My tasks" filter.
+
+CHECKED FIRST, PER INSTRUCTION
+  tasks already had `due_date` and `priority` (migration 007) — both already
+  editable in TaskDetail. No schema change needed for either; only UI
+  permission-gating was added (see below). tasks also already had
+  `assigned_to uuid[]`, but it had no way to enforce "only active project
+  members," no per-assignment actor/timestamp, and no clean per-assignment
+  audit trail (only a whole-array diff) — per the brief's preferred
+  approach, migration 026 adds a proper `task_assignees` join table as the
+  new source of truth. `assigned_to` itself is untouched (unused by the new
+  UI, not dropped) — no destructive schema change.
+
+PRE-EXISTING BUGS FOUND AND FIXED (not introduced by this step)
+  1. `notifications` has RLS enabled but has only ever had SELECT/UPDATE
+     policies scoped to `user_id = auth.uid()` (migration 013) — there has
+     never been an INSERT policy of any kind. Both existing client-side
+     `insertNotification()` calls in TaskDetail.tsx (task_assigned on
+     assignment, task_commented on comment) have been silently failing
+     since they were written — RLS default-denies with no matching policy,
+     and neither call site checked the returned error. No notification of
+     either kind has ever actually been created. Fixed by moving
+     notification creation entirely server-side (SECURITY DEFINER
+     triggers/RPC — the same pattern already used everywhere in this
+     schema) instead of adding a client-writable INSERT policy, which would
+     let any authenticated user spam/phish another user_id with arbitrary
+     notification content. notifications still has zero client-writable
+     INSERT policies after this migration — RLS is not loosened.
+  2. `components/projects/TaskDetail.tsx` was one of the three files
+     flagged (but not fixed) in Step 21C's Known Issue #10 as still using
+     the `profiles!<table>_<column>_fkey` embed pattern that can never work
+     (no direct FK from task_comments/task_activity to profiles). Since
+     this step required deep changes to TaskDetail's comment handling
+     anyway (for mentions), fixed it here using the same two-step-fetch
+     pattern (fetchProfilesByIds) already established elsewhere — comment
+     and activity author names now actually resolve. This closes 2 of the
+     3 remaining Known Issue #10 occurrences; `app/(app)/team/page.tsx` and
+     `app/(app)/dashboard/page.tsx` remain, still flagged as a separate
+     follow-up, not expanded into this step.
+
+WHAT WAS BUILT
+  - supabase/migrations/026_task_assignment_collaboration.sql
+    - task_assignees(id, task_id, project_id, user_id, assigned_by,
+      assigned_at) — project_id/assigned_by/assigned_at are all stamped
+      server-side by a BEFORE INSERT trigger (enforce_task_assignee_project)
+      that derives project_id from the task itself (never trusts client
+      input, so it can't be spoofed to check permissions against the wrong
+      project) and rejects assigning a personal task outright.
+    - is_active_project_member(project_uuid, target_user) — same
+      SECURITY DEFINER pattern as every other permission helper,
+      parameterized so it can validate an assignee, not just the caller.
+    - RLS: any project member (including viewers) can SEE who's assigned
+      (read-only visibility, not an edit right); only owner/manager/editor
+      can assign, and only to a currently-active project member; only
+      owner/manager/editor can unassign.
+    - Audit: task_assignees INSERT/DELETE reuse the existing generic
+      log_audit_event() trigger (the table already carries project_id
+      directly, like project_members, so no special-case branch was
+      needed). formatAuditEvent.ts gained a task_assignees case producing
+      exactly the requested readable lines ("Marvin assigned Sipho to
+      'Fix roof'" / "Marvin removed Sipho from 'Fix roof'") — this needed
+      a task-title lookup since these audit rows only carry task_id, so
+      ProjectAuditTrail.tsx now also fetches a taskTitleMap alongside its
+      existing nameMap, via a new fetchTaskTitlesByIds helper.
+    - notify_task_assignee() trigger (AFTER INSERT ON task_assignees) —
+      fully automatic task_assigned notification, no client call needed.
+    - notify_task_comment() trigger (AFTER INSERT ON task_comments) — the
+      fix for pre-existing bug #1's task_commented half.
+    - create_mention_notifications(comment_id, mentioned_user_ids) RPC —
+      mention *parsing* (matching "@name"/"@email" text) happens
+      client-side against the already-loaded active-member list
+      (lib/utils/mentions.ts, deliberately simple regex + exact-match, no
+      rich-text editor); this RPC is the actual trust boundary — it
+      independently re-validates the comment's authorship and every
+      mentioned id's active project membership server-side before creating
+      anything, so a client can't forge mentions for non-members. This is
+      also what keeps a removed member from getting a new mention
+      notification and keeps a non-member from learning a project exists
+      via a mention.
+    - notifications.type CHECK constraint extended with
+      access_request_approved / access_request_rejected (the exact gap
+      flagged as a clean TODO back in Step 21B) — looked up the actual
+      constraint name dynamically via pg_constraint rather than assuming
+      the default-generated name, so this can't silently leave the old
+      5-value constraint in place alongside a new one.
+    - notify_access_request_status() trigger (AFTER UPDATE ON
+      project_access_requests) — approved/rejected notifications.
+    - task_assignees added to the realtime publication, with
+      REPLICA IDENTITY FULL specifically (the project page's realtime
+      handler needs task_id/user_id out of DELETE payloads, which
+      Postgres only sends if the table's replica identity includes the
+      full row — same constraint documented in useRealtime.ts for `tasks`,
+      which didn't need it and worked around it; task_assignees does).
+  - lib/permissions/projectPermissions.ts — canAssignTask,
+    canEditTaskMetadata (both = canEditProjectContent: owner/manager/
+    editor), canMentionMembers (= canCommentOnProject).
+  - lib/utils/mentions.ts — parseMentions(text, candidates).
+  - lib/utils/dueDate.ts — getDueDateStatus(dueDate, status) shared by
+    TaskCard and ListView so overdue/due-today styling isn't duplicated.
+  - lib/utils/taskTitles.ts — fetchTaskTitlesByIds, same two-step-fetch
+    pattern as fetchProfilesByIds.
+  - lib/utils/activity.ts — removed insertNotification (dead code; it
+    never actually worked, see bug #1 above).
+  - components/projects/TaskAssigneesPanel.tsx (new) — assignee chips
+    with avatar/name, a visible "(removed)" marker + strikethrough for an
+    assignee who is no longer an active project member (kept, per
+    instruction, rather than deleted — historical assignment stays
+    visible), an "Assign" picker restricted to current active members not
+    already assigned. Add/remove controls only render for
+    canAssignTask(role); the list itself is always visible.
+  - components/shared/AssigneeAvatars.tsx (new) — small avatar-stack,
+    extracted so TaskCard and ListView don't duplicate the same ~25 lines.
+  - components/projects/TaskDetail.tsx — new Assignees section; priority/
+    due-date inputs now `disabled` for viewer/commenter
+    (canEditTaskMetadata); comment input replaced with a permission notice
+    for non-commenters (canCommentOnProject); mention detection + RPC call
+    wired into sendComment; fixed the broken profile-embed queries (bug #2
+    above); removed the two dead insertNotification calls.
+  - components/projects/TaskCard.tsx — assignee avatars now render from an
+    assigneesMap-derived prop instead of the legacy `assigned_to` column
+    (falls back to it only if no map is supplied, defensive); overdue/
+    due-today logic extracted to the shared getDueDateStatus helper
+    (behavior unchanged, just de-duplicated).
+  - components/projects/ListView.tsx — added an Assignees column
+    (desktop) / inline avatars (mobile), overdue/due-today due-date
+    coloring (previously only on TaskCard), a myTasksOnly filter, and
+    started actually forwarding projectRole into TaskDetail (it accepted
+    the prop already but never passed it through — TaskDetail always saw
+    role=null when opened from List view, silently over-restricting there
+    before this fix, under-restricting nowhere since RLS was always the
+    real backstop).
+  - components/projects/BoardView.tsx / BoardColumn.tsx — thread
+    assigneesMap through to TaskCard; myTasksOnly filtering in
+    getColumnTasks (both desktop columns and the mobile tab view).
+  - app/(app)/projects/[id]/page.tsx — fetches task_assignees once for the
+    whole project into an assigneesMap (taskId -> user_id[]), keeps it
+    live via its own realtime channel (separate from the existing
+    task-focused useRealtime hook — didn't touch that hook), and adds the
+    "My tasks" toggle button next to the Board/List/Activity view switch.
+  - components/layout/Header.tsx — notification bell icon map extended
+    with the two new access_request_* types.
+  - types/index.ts — TaskAssignee interface; NotificationType extended.
+
+NOT BUILT (deliberate scope cuts, matching the brief's own "optional"/
+"do not overbuild" language)
+  - No standalone app/(app)/my-tasks/page.tsx — explicitly marked optional
+    in the brief ("project-level My tasks is enough for this step").
+    Project-level toggle only.
+  - "Task you are assigned to was updated" notification — explicitly
+    marked optional in the brief, skipped to avoid overbuilding.
+  - No rich-text mention autocomplete/dropdown while typing — mentions are
+    detected on send, not suggested while composing. Matches "keep this
+    simple," not a rich text editor.
+  - Title/description editing in TaskDetail is still not permission-gated
+    in the UI (pre-existing gap, same as before this step) — RLS already
+    blocks a non-editor's write at the database layer either way; only
+    priority/due-date/comments/assignees (the fields this step's spec
+    actually named) got UI-level gating added.
+
+TESTING
+  npm run lint       -> PASS, no warnings or errors
+  npx tsc --noEmit   -> PASS, zero errors
+  npm run build      -> PASS, compiled clean, 21/21 routes generated
+
+LIVE VERIFICATION (2026-07-09, post-026, real authenticated sessions for
+every write — Marvin and Shafica's own real sessions, with Shafica's
+project_members role/status flipped between owner/manager/editor/
+commenter/viewer/removed by Marvin's owner session between checks to cover
+every role; service role used only for baseline/diagnostic reads, session
+generation, and exact-id cleanup):
+  A.  PASS owner can assign task to an active member
+  B.  PASS manager can assign task
+  C.  PASS editor can assign task
+  D.  PASS commenter cannot assign task (42501)
+  E.  PASS viewer cannot assign task (42501)
+  F.  PASS removed member cannot be newly assigned (42501 — is_active_
+      project_member correctly fails even for an otherwise-permitted actor)
+  G.  PASS assigned member can read her own assignment row and the task
+      itself (the exact data My Tasks' client-side filter reads)
+  H.  PASS owner can set due date
+  I.  PASS owner can set priority
+  J.  PASS viewer cannot edit due date/priority (silently 0 rows affected,
+      matching this schema's established USING-only RLS behavior)
+  K.  PASS commenter can comment
+  K bonus PASS a comment by someone other than the task's creator now
+      actually notifies the creator (task_commented) — confirms bug #1's
+      fix works, not just that RLS didn't block the insert
+  L.  PASS viewer cannot comment (42501)
+  M.  PASS mentioning an active member creates exactly one new mention
+      notification
+  N.  PASS mentioning a since-removed member creates NO new mention
+      notification — the RPC's server-side re-validation is the actual
+      trust boundary, confirmed independent of what the client claims
+  O.  PASS assignment creates a task_assigned notification
+  P.  PASS task_assignees INSERT and DELETE events both appear correctly
+      typed in audit_events (Activity tab source data)
+  Q.  PASS due date change and priority change both appear in audit_events
+  R.  PASS cross-user isolation: Shafica cannot see a fresh unrelated
+      project, and neither user can read the other's notifications directly
+  S.  PASS personal tasks still create fine; assigning one is correctly
+      rejected (no project to assign into) — the trigger's dedicated guard
+  T.  Cleanup: 43/48 checks passed on the first pass. 5 initially read as
+      failures; verification found they split into two causes:
+        - 4 were a flaw in the test script itself, not the product: it
+          asserted project_members/tasks/audit_events/notifications were
+          empty after cleanup without having captured a baseline for those
+          tables first — there is a real, pre-existing production project
+          ("Regal Bay Properties (Pty) Ltd", 1 task, 1 owner membership,
+          3 audit rows) that was already live before this test ran and was
+          correctly left untouched throughout (confirmed by exact-id
+          inspection). Once judged against the right baseline, all of
+          these are correct, not failures.
+        - 1 was a genuine finding: hard-deleting the test project left 3
+          orphaned audit_events rows (project_id AND workspace_id both
+          null) tied to task_comments cascade-deleted along with their
+          tasks. Root cause: log_audit_event() resolves task_comments'
+          project_id *indirectly* (via a lookup through the tasks table)
+          unlike every other entity type, which reads project_id directly
+          off their own row. 21C.1's fix (025) only guarded "project_id
+          was found, but looking that project up then failed" — it didn't
+          anticipate a *second* cascade level where the task_comments row
+          resolves through a task that's ALSO already gone in the same
+          transaction, leaving v_project_id at its NULL default and
+          skipping the guard entirely. Root-caused and fixed in
+          supabase/migrations/027_fix_task_comments_cascade_orphan.sql,
+          which gives task_comments the same "parent is gone mid-cascade,
+          skip instead of orphan" treatment every other entity type
+          already had. The 3 orphan rows plus the 3 test notifications
+          were deleted by exact id (confirmed via direct row inspection
+          before deleting — all 6 unambiguously test residue, timestamped
+          within the verification run, matching this script's literal
+          test strings). DB confirmed back to the true pre-test state:
+          3 audit_events (all belonging to the real pre-existing project,
+          untouched), 0 notifications, 1 real project, 2 real workspaces/
+          workspace_members.
+
+BOTTOM LINE
+  Step 21D is complete and safe. Every actually-requested behavior (A-S)
+  passed on the first live pass. Migration 027 is a narrow, non-security
+  cleanup fix for a cascade-orphan edge case this step's own testing
+  happened to surface — it does not change or weaken anything Step 21D
+  itself does, and is written/reviewed but not yet applied to live
+  Supabase (needs Marvin to run it same as every other migration in this
+  project). No real workspace/user/project data was touched at any point.
+```
+
+---
+
 ## 🚧 KNOWN ISSUES
 
 | # | Issue | Step | Severity | Status |
@@ -1239,7 +1502,8 @@ BOTTOM LINE
 | 7 | **Incident (self-inflicted, during verification cleanup):** a cleanup script used `.ilike('name', '__%')` intending to match test-data names starting with a literal double-underscore. In SQL `LIKE`/`ILIKE`, `_` is a single-character wildcard, not a literal — so `__%` matched *any* name of 2+ characters, including both real workspaces ("Regalbay Property Management" and "Marvin"), and the script deleted them via the service-role client (bypasses RLS). **Caught immediately** via a full row-count audit across every table right after. Restored both workspaces and their workspace_members rows with their exact original `id`, `name`, `owner_id`, `role`, and `joined_at` (all captured earlier in the same session from prior read-only queries) — full audit confirmed no other table was affected (projects/tasks/etc. were all correctly empty before and after, matching pre-verification state). **Two fields could not be restored exactly** because they were never read before deletion: `workspaces.slug` (guessed as `regalbay-property-management` / `marvin`) and `workspaces.created_at`/`updated_at` (now stamped at restoration time instead of the true original creation date, ~2026-06-08/09). `logo_url` and `plan` were restored as `null`/`'free'`, which matches what every prior query showed. Marvin should check Settings → Workspace for both workspaces to confirm name/logo look right, and mention it if the slug is used anywhere (e.g. a shareable link) that depended on its exact original value. | 21A verification | **High (data)** | ✅ Restored (see caveats above) |
 | 8 | **Privilege escalation (found and fixed before ever being exploitable):** the Step 21A UPDATE policy on `project_access_requests` had `USING (user_id = auth.uid() OR can_manage_project(project_id))` with no `WITH CHECK`. Postgres reuses `USING` as the check when none is given, so a requester could update their own row and set `status = 'approved'` directly — self-approving. Harmless in isolation (nothing consumed that status transition yet), but Step 21B adds a trigger that auto-grants `project_members` on approval, which would have turned this into a real, exploitable escalation. Fixed in migration 022 before that trigger went live: self-service UPDATE removed entirely (only owner/manager can move a request to approved/rejected), and INSERT now forces `status = 'pending'` so a request can never be created already-approved either. | 21B | **High** | ✅ Fixed in 022, verified live |
 | 9 | Migration 022's `enforce_project_member_rules()` trigger fires on the cascading delete of `project_members` when a project is deleted, and its "don't remove the last owner" check couldn't tell that apart from a standalone removal — briefly regressing 021's owner-hard-delete (blocked with "Cannot remove the last active owner of a project" for every project, no exceptions). Found immediately during Step 21B's live verification (4 test-cleanup deletes failed). Fixed in migration 023 by checking whether the parent project row still exists before enforcing the owner rules — same technique as the 019 audit_events cascade fix. Re-verified: owner hard-delete works normally again. | 21B | Medium | ✅ Fixed in 023, verified live |
-| 10 | **Pre-existing (not introduced by any recent step):** `profiles` RLS only ever allowed a user to see their own row, and separately the `profiles!<table>_<column>_fkey` embed syntax used throughout the app can never work — those tables' `user_id` columns have a foreign key to `auth.users`, not to `profiles`, so PostgREST has no relationship to traverse under any hint name (confirmed live: PGRST200 "relationship not found" every time). Together this means no teammate's name/avatar has ever actually rendered anywhere in the app for a second real user — silently, since the calling code always falls back to an empty/blank state rather than surfacing the query error. Fixed the RLS half everywhere (migration 024, `can_view_profile()` — collaboration-scoped, not blanket-open) and the query-syntax half in the 3 files Step 21C actually touches (`ProjectMembersPanel`, `ProjectAccessRequests`, the project page's assignee-avatar map). **Three occurrences remain unfixed** — `app/(app)/team/page.tsx`, `app/(app)/dashboard/page.tsx`, `components/projects/TaskDetail.tsx` — flagged as a separate follow-up task rather than expanded into this step; the RLS prerequisite (024) is already in place for whenever that lands, only the query syntax in those 3 files still needs the same two-step-fetch fix. | 21C | High (pre-existing UX defect, not a security issue) | ⬜ Partially fixed — 3 files still pending, follow-up task flagged |
+| 10 | **Pre-existing (not introduced by any recent step):** `profiles` RLS only ever allowed a user to see their own row, and separately the `profiles!<table>_<column>_fkey` embed syntax used throughout the app can never work — those tables' `user_id` columns have a foreign key to `auth.users`, not to `profiles`, so PostgREST has no relationship to traverse under any hint name (confirmed live: PGRST200 "relationship not found" every time). Together this means no teammate's name/avatar has ever actually rendered anywhere in the app for a second real user — silently, since the calling code always falls back to an empty/blank state rather than surfacing the query error. Fixed the RLS half everywhere (migration 024, `can_view_profile()` — collaboration-scoped, not blanket-open) and the query-syntax half in the 3 files Step 21C actually touches (`ProjectMembersPanel`, `ProjectAccessRequests`, the project page's assignee-avatar map). Fixed in `components/projects/TaskDetail.tsx` during Step 21D (already needed to touch comment handling there for mentions). **Two occurrences remain unfixed** — `app/(app)/team/page.tsx`, `app/(app)/dashboard/page.tsx` — still flagged as a separate follow-up; the RLS prerequisite (024) is already in place for whenever that lands, only the query syntax in those 2 files still needs the same two-step-fetch fix. | 21C / 21D | High (pre-existing UX defect, not a security issue) | 🔄 Partially fixed — 2 files still pending, follow-up task flagged |
+| 12 | **Found during Step 21D's live verification, not introduced by 21D:** hard-deleting a project whose tasks had comments left invisible orphan `audit_events` rows (project_id AND workspace_id both null) for the `task_comments` cascade-deletes — a second-level version of the exact problem Step 21C.1 (migration 025) was meant to fully close. Root cause: unlike every other audited entity type, `task_comments` resolves its project_id *indirectly* (a lookup through the `tasks` table) rather than reading it off its own row; 025's fix only guarded "project_id was found, but the project lookup then failed," and never anticipated a second cascade level where the task_comments row's own lookup-through-tasks fails because the task is *also* already gone in the same transaction. Root-caused and fixed in `supabase/migrations/027_fix_task_comments_cascade_orphan.sql`, giving task_comments the same "parent gone mid-cascade, skip instead of orphan" treatment every other entity type already had. The 3 orphan rows from this test run were deleted by exact id as part of Step 21D's verification cleanup. **Migration 027 is written and reviewed but not yet applied to live Supabase.** | 21D verification | Medium | 🔄 Fixed in code — migration 027 not yet applied |
 | 11 | `audit_events` rows generated by a project's own cascading delete (documenting the project/its members/its tasks being deleted) had `project_id` and `workspace_id` nulled by the Step 21A fix that avoids an FK violation during cascade — but the `audit_events` SELECT policy requires `project_id IS NOT NULL`, so those rows were permanently invisible to everyone (short of the service role) instead of either being cleanly removed or genuinely retained as visible history. **Resolved by product decision in Step 21C.1** (migration 025): archiving preserves full audit history unchanged (verified live); hard delete now purges that project's audit_events (pre-existing rows already cascade-deleted via the FK; cascade-child events — project_members/tasks/task_comments deletes fired during the same transaction — are no longer inserted at all once the parent project is gone, instead of being inserted orphaned) and logs one workspace-level `HARD_DELETE` marker (project_id NULL, workspace_id preserved) visible only to the workspace owner/admin via one narrow added RLS branch. One-time cleanup removed the 39 pre-existing orphan rows. **Migration 025 applied and fully verified live — 25/25 checks passed**, including confirming zero new orphans get created, exactly one marker is logged per hard delete, and the marker is visible to the owner but not to an unrelated user. | 21C / 21C.1 | Medium | ✅ Fixed and verified live |
 
 ---
@@ -1288,6 +1552,8 @@ BOTTOM LINE
 | 2026-07-09 | Step 21B — invite/approval UI, built and fully verified | Built the full invite-link + approval + member-management system: ProjectShareModal, ProjectAccessRequests, ProjectMembersPanel, the /invite/project/[token] landing page, and lib/invites/projectInvites.ts (client-side Web Crypto token generation/hashing — only SHA-256 hash ever reaches the DB). Reviewed RLS before writing UI code per instruction and found a real one: the Step 21A access-request UPDATE policy had no WITH CHECK, letting a requester self-approve — harmless until this step's approval-triggered auto-membership grant would have made it exploitable. Fixed in migration 022 before that trigger went live. Also added owner-protection on project_members (manager can't touch an owner's row, no path to zero owners) and two SECURITY DEFINER RPCs (get_invite_status, redeem_project_invite) so the invite-preview/redeem flow never needs service-role or broadened RLS. Live verification's first pass (42/48) caught a real regression: the new owner-protection trigger also fired during a project's cascade-delete of its own project_members, blocking all project hard-deletion. Fixed same-day in migration 023 (mirrors the 019 audit_events cascade fix), re-verified: **55/55 checks passing total.** No real workspace/user data touched; cleanup used exact ids only, service role used solely for read-only snapshots and deleting this test's own project_invites/project_access_requests rows (tables with no DELETE policy for any role). Step 21B is safe. Not yet committed to git. |
 | 2026-07-09 | Step 21C — project activity/audit trail, built and fully verified | Built the Activity tab (History icon, next to Board/List), gated by the existing canViewAuditTrail(role) helper — no new permission logic needed. Before writing any UI, investigated actor-display feasibility and found a real, pre-existing, previously-undiscovered bug: the `profiles!<table>_<column>_fkey` embed pattern used app-wide can never work (no direct FK from those tables to profiles), and profiles RLS only ever allowed self-visibility — together meaning no teammate's name has ever rendered anywhere for a second real user, silently, since Team page's original build. Fixed the RLS half everywhere (migration 024, can_view_profile()) and the query-syntax half in this step's own 3 touched files; flagged the other 3 pre-existing occurrences (Team page, Dashboard, TaskDetail) as a separate follow-up task rather than expanding scope. Built lib/audit/formatAuditEvent.ts (readable labels for all entity types, raw JSON behind a disclosure) and ProjectAuditTrail.tsx (filters, load-more pagination, realtime via its own channel — didn't touch the existing task-realtime hook). Live verification: 25/25 passed on the first pass; one assertion ("audit_events empty after cleanup") led to a real finding rather than a test bug — cascade-delete-generated audit rows get project_id nulled (Step 21A's FK-violation fix) but the SELECT policy requires project_id IS NOT NULL, so those rows become permanently invisible to everyone instead of being cleanly removed or genuinely retained as history. Found 39 such rows accumulated across every prior test round back through Step 21A; confirmed all were fully-orphaned test residue and deleted by exact id. Logged as an open, three-way product decision for Marvin (Known Issue #11), not resolved unilaterally. Step 21C is safe. Not yet committed to git. |
 | 2026-07-09 | Step 21C.1 — audit retention cleanup for hard-deleted projects, built and fully verified | Built per explicit product decision (given, not chosen unilaterally): archiving preserves full audit history; hard delete purges that project's audit_events instead of leaving invisible orphans, plus one workspace-owner/admin-only HARD_DELETE marker. Migration 025 changes log_audit_event() so cascade-child audit events (project_members/tasks/task_comments deletes fired during a project's own cascade) are no longer inserted at all once the parent project is gone — the actual source of the 39 orphans Step 21C found — and adds a special case logging exactly one HARD_DELETE row per project delete with project_id NULL but workspace_id preserved from OLD. audit_events SELECT policy got one narrow added OR branch for that marker (workspace admin/owner only) — the existing project-role branch is untouched. Included a one-time cleanup DELETE for the 39 pre-existing orphans (exact condition: project_id AND workspace_id both null). npm run lint / npx tsc --noEmit / npm run build all clean. Marvin applied migration 025; live re-verification via real authenticated sessions for both real users (Marvin owner, Shafica unrelated) confirmed all requested scenarios: archive/restore history stays visible, hard delete leaves zero project-scoped rows and zero new orphans, exactly one HARD_DELETE marker is logged and it's visible to the owner but not to Shafica, cleanup by exact id only. **25/25 checks passed, DB confirmed back to byte-identical pre-test state.** Known Issue #11 resolved. Not yet committed to git. |
+| 2026-07-09 | Step 21D — practical collaboration tools, built (not yet live-verified) | Built task assignment (new task_assignees join table + RLS + audit + notifications, replacing the old unenforceable `assigned_to uuid[]` array as the source of truth going forward), due-date/priority UI permission gating (fields already existed from Step 1, just weren't role-gated in the UI), @mention detection + a validating RPC for mention notifications, and a project-level My Tasks filter. Found and fixed two real pre-existing bugs while investigating notifications before writing new ones (per instruction): (1) `notifications` has never had an INSERT policy of any kind, so both existing client-side notification calls in TaskDetail.tsx (task_assigned, task_commented) have been silently failing since they were written — fixed by moving notification creation server-side via SECURITY DEFINER triggers/RPC instead of opening a client-writable INSERT policy; (2) TaskDetail.tsx was one of the three files flagged-but-unfixed in Step 21C's Known Issue #10 for the broken `profiles!<table>_<column>_fkey` embed pattern — fixed here since this step already required touching comment handling for mentions, closing 2 of the remaining 3 occurrences. Also extended notifications.type for access_request_approved/rejected (the exact gap flagged as a TODO in Step 21B). npm run lint / npx tsc --noEmit / npm run build all clean. **Migration 026 not yet applied to live Supabase and not yet live-verified** — code-complete only this round. Not yet committed to git. |
+| 2026-07-09 | Step 21D — live verification, migration 026 applied, complete | Marvin applied migration 026. Ran the full A-T verification via real authenticated sessions for both real users, flipping Shafica's project_members role/status between owner/manager/editor/commenter/viewer/removed to cover every permission boundary. 43/48 checks passed on the first pass. Investigated all 5 "failures": 4 were a flaw in the test script itself (it assumed project_members/tasks/audit_events/notifications would be empty after cleanup without ever capturing a real baseline for those tables — there's a genuine pre-existing production project, "Regal Bay Properties (Pty) Ltd," that was already live and correctly untouched throughout); the 5th was a real finding — hard-deleting a project whose tasks had comments left 3 invisible orphan audit_events rows, a second-level version of the exact Known Issue #11 problem 21C.1 was meant to fully close (task_comments resolves its project_id indirectly through the tasks table, and 21C.1's guard never anticipated the task itself also being gone by the time task_comments' cascade-delete trigger fires). Root-caused and fixed in migration 027 (not yet applied); cleaned up the 3 orphan rows plus 3 test notifications by exact id, confirmed via direct inspection that all 6 were unambiguous test residue before deleting. DB confirmed back to the true pre-test state (3 real audit rows, 0 notifications, 1 real project, 2 real workspaces, all untouched). Every actually-requested Step 21D behavior (task assignment by role, due-date/priority permission gating, comment permission gating, mentions with server-side re-validation, all 4 notification types, Activity tab entries, My Tasks visibility, cross-user isolation, personal-task regression) passed. Step 21D is complete and safe. |
 
 ---
 
