@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -21,6 +21,8 @@ type LoginValues = z.infer<typeof loginSchema>
 
 export default function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirectTo') || '/dashboard'
   const [showPassword, setShowPassword] = useState(false)
   const [oauthLoading, setOauthLoading] = useState(false)
 
@@ -40,7 +42,7 @@ export default function LoginForm() {
       toast.error('Login failed', { description: 'Check your email and password and try again.' })
       return
     }
-    router.push('/dashboard')
+    router.push(redirectTo)
     router.refresh()
   }
 
@@ -49,7 +51,7 @@ export default function LoginForm() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}` },
     })
     if (error) {
       toast.error('Google sign-in failed', { description: error.message })

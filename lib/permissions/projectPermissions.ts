@@ -29,3 +29,23 @@ export function canArchiveProject(role: ProjectRole | null): boolean {
 export function canRestoreProject(role: ProjectRole | null): boolean {
   return role === 'owner'
 }
+
+// Invite/request/member management — owner and manager, matching
+// can_manage_project() in the database.
+export function canManageInvites(role: ProjectRole | null): boolean {
+  return canManageProject(role)
+}
+
+export function canReviewAccessRequests(role: ProjectRole | null): boolean {
+  return canManageProject(role)
+}
+
+// A manager may add/change/remove other members, but never an owner's own
+// membership row — only another owner can touch that. Mirrors the DB
+// trigger (enforce_project_member_rules) so the UI doesn't offer actions
+// the database will reject anyway.
+export function canModifyMemberRow(actingRole: ProjectRole | null, targetRole: ProjectRole): boolean {
+  if (!canManageProject(actingRole)) return false
+  if (targetRole === 'owner' && actingRole !== 'owner') return false
+  return true
+}

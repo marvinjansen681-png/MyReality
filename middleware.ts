@@ -7,7 +7,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const { supabaseResponse, user } = await updateSession(request)
 
-  const isPublic = PUBLIC_ROUTES.some(r => pathname === r) || pathname.startsWith('/_next') || pathname.startsWith('/api/auth')
+  const isPublic = PUBLIC_ROUTES.some(r => pathname === r) || pathname.startsWith('/_next') || pathname.startsWith('/api/auth') || pathname.startsWith('/invite/')
 
   if (!user && !isPublic) {
     const loginUrl = request.nextUrl.clone()

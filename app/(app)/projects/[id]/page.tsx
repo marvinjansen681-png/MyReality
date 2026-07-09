@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, LayoutGrid, List, ArrowLeft } from 'lucide-react'
+import { Loader2, LayoutGrid, List, ArrowLeft, Share2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
+import { canManageInvites } from '@/lib/permissions/projectPermissions'
 import BoardView from '@/components/projects/BoardView'
 import ListView from '@/components/projects/ListView'
+import ProjectShareModal from '@/components/projects/ProjectShareModal'
 import type { Project, Column, Task, Profile, ProjectRole } from '@/types'
 
 export default function ProjectPage({ params }: { params: { id: string } }) {
@@ -20,6 +22,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const [view, setView] = useState<'board' | 'list'>('board')
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -98,6 +101,16 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           <h1 className="font-display text-xl lg:text-2xl font-bold text-primary truncate">{project?.name}</h1>
           {project?.description && <p className="text-xs text-secondary truncate">{project.description}</p>}
         </div>
+        {/* Share / Invite */}
+        {canManageInvites(projectRole) && (
+          <button
+            onClick={() => setShareOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-secondary hover:text-primary hover:bg-hover rounded-lg transition-colors flex-shrink-0 min-h-[40px]"
+          >
+            <Share2 size={15} />
+            <span className="hidden sm:inline">Share</span>
+          </button>
+        )}
         {/* View toggle */}
         <div className="flex items-center bg-hover rounded-lg p-1 gap-1 flex-shrink-0">
           <button
@@ -133,6 +146,16 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           userId={userId ?? ''}
           userProfile={userProfile}
           projectRole={projectRole}
+        />
+      )}
+
+      {shareOpen && project && userId && (
+        <ProjectShareModal
+          projectId={project.id}
+          projectName={project.name}
+          currentUserId={userId}
+          currentRole={projectRole}
+          onClose={() => setShareOpen(false)}
         />
       )}
     </main>

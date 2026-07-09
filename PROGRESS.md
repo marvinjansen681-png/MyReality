@@ -7,18 +7,19 @@
 ## ▶️ CURRENT STATUS
 
 ```
-NEXT STEP TO BUILD:  Step 21B — Project Invite + Approval UI
-OVERALL PROGRESS:    20 of 20 original steps complete + Step 21A complete and
-                     fully verified live + Step 21A.1 complete and fully
-                     verified live (39/39 security-relevant checks passing)
-LAST COMMIT:         (uncommitted) step-21a: project collaboration security foundation
+NEXT STEP TO BUILD:  Step 21C? — no more steps currently requested. Step 21B
+                     (Project Invite + Approval UI) is complete and fully
+                     verified live.
+OVERALL PROGRESS:    20 of 20 original steps + Step 21A + Step 21A.1 + Step 21B
+                     all complete and fully verified live.
+LAST COMMIT:         28fc6a0 (Step 21A + 21A.1, pushed) — Step 21B not yet
+                     committed/pushed, see below.
 APP STATUS:          npm run lint ✅ · npx tsc --noEmit ✅ · npm run build ✅ zero errors
-                     ✅ Project creation fixed and verified (RETURNING+trigger race,
-                     see Known Issue #4). ✅ Archive/delete hardening (021) applied and
-                     fully verified — owner-only archive/restore/delete, managers keep
-                     content-editing rights but not project lifecycle, audit-labeled
-                     ARCHIVE/RESTORE, cross-user isolation intact. Step 21A + 21A.1 are
-                     both safe. Ready for Step 21B.
+                     ✅ Step 21B (invite links, approval flow, member management) built,
+                     migrations 022+023 applied and verified live — 55/55 checks passing.
+                     Raw invite tokens confirmed never stored (only SHA-256 hash). RLS was
+                     tightened, never weakened — one real self-approval privilege-escalation
+                     bug from Step 21A was found and fixed along the way (see Known Issue #8).
 ```
 
 ---
@@ -49,7 +50,7 @@ APP STATUS:          npm run lint ✅ · npx tsc --noEmit ✅ · npm run build �
 | 20 | Final QA | ✅ Complete | step-20 | Zero TS errors, npm run build clean, all lint fixed |
 | 21A | Project Collaboration Security Foundation | ✅ Complete | step-21a | project_members/invites/access_requests/audit_events, RLS lockdown, permission helpers |
 | 21A.1 | Project Archive/Delete Policy Hardening | ✅ Complete, verified live | step-21a-1 | Archive fields, owner-only archive/restore/delete trigger+policy, resolves Known Issue #6 |
-| 21B | Project Invite + Approval UI | ⬜ Not started | — | Next up — build the invite link + request/approve UI on top of 21A's schema |
+| 21B | Project Invite + Approval UI | ✅ Complete, verified live | step-21b | Invite links, approval flow, member management, migrations 022+023 |
 
 **Status icons:**
 ⬜ Not started | 🔄 In progress | ✅ Complete | ❌ Blocked
@@ -772,6 +773,162 @@ TESTING — live verification results (2026-07-09, post-021)
 
 ---
 
+### Step 21B — Project Invite Link + Approval UI
+```
+Status:     ✅ Complete — migrations applied, fully verified live
+Started:    2026-07-09
+Completed:  2026-07-09
+
+PRODUCT RULE (as directed)
+  An invite link does NOT grant access by default. Flow is always:
+  open link -> sign in -> explicit "Request Access"/"Join" click -> (if
+  approval_required) owner/manager approves -> membership granted. Even
+  the approval_required=false "auto-approve" case still requires an
+  explicit click on the landing page — never fires from merely loading
+  the URL (deliberately, so link-preview bots/crawlers can't consume it).
+
+WHAT WAS BUILT
+  - supabase/migrations/022_project_invite_approval_ui_support.sql
+    - FIX (real bug, not just a gap): the Step 21A UPDATE policy on
+      project_access_requests had no WITH CHECK, so Postgres reused USING
+      as the check — a requester could update their own row straight to
+      status='approved', self-approving. Latent until this step adds an
+      approval-triggered auto-membership grant, at which point it becomes
+      a real privilege escalation. Fixed: only owner/manager may move a
+      request to approved/rejected; self-service INSERT is now forced to
+      status='pending'.
+    - enforce_project_member_rules() trigger: manager can no longer change
+      an owner's role or remove an owner; no operation can ever leave a
+      project with zero active owners. Also stamps removed_at/removed_by
+      server-side on soft-delete (status -> 'removed').
+    - handle_access_request_approval() trigger: approving a request is a
+      single UPDATE (status='approved') — the trigger atomically
+      provisions project_members and increments the invite's used_count,
+      instead of the client doing 2-3 separate writes that could partially
+      fail.
+    - validate_project_access_request() trigger: defense-in-depth check
+      that a request's invite_id (if any) is real, matches the project,
+      and is still valid — independent of what inserted the row.
+    - get_invite_status(token_hash) — SECURITY DEFINER RPC, callable by
+      signed-out visitors, returns only safe preview fields (project name/
+      icon/color, default_role, approval_required, validity status).
+      Never returns token_hash.
+    - redeem_project_invite(token_hash) — SECURITY DEFINER RPC, requires
+      auth.uid(). The only path that turns a valid invite into a pending
+      request or (approval_required=false only) actual membership.
+      Re-validates everything server-side regardless of what the preview
+      showed.
+  - supabase/migrations/023_fix_owner_removal_on_project_delete.sql
+    - Found during live verification: 022's owner-protection trigger also
+      fires on the CASCADE delete of project_members when a project itself
+      is deleted, and blocked it as "removing the last owner" — regressing
+      021's owner-hard-delete. Fixed by checking whether the parent project
+      row still exists before enforcing the owner rules (same technique as
+      019's audit_events cascade fix).
+  - lib/invites/projectInvites.ts — generateInviteToken (Web Crypto
+    getRandomValues, 256 bits), hashInviteToken (Web Crypto SHA-256),
+    createProjectInvite, revokeProjectInvite, getInviteByToken,
+    redeemProjectInvite. No raw token is ever logged or sent anywhere
+    except embedded in the URL the creator copies themselves.
+  - components/projects/ProjectShareModal.tsx — tabbed (Invite Link /
+    Requests / Members) modal, owner+manager only. Create invite (role,
+    approval toggle defaulting true, expiry, max uses), one-time copyable
+    link display, revoke, small recent-activity feed from audit_events.
+  - components/projects/ProjectAccessRequests.tsx — pending request list,
+    approve/reject with optional review note.
+  - components/projects/ProjectMembersPanel.tsx — active member list,
+    role change, remove (soft delete) — UI hides actions the DB would
+    reject anyway (canModifyMemberRow mirrors the DB trigger).
+  - app/invite/project/[token]/page.tsx — handles every state: not signed
+    in (preview + sign in/up CTA), invalid/revoked/expired/max-used,
+    already a member (read-only pre-check, no click needed), pending
+    request already exists, and the explicit request/join action.
+  - middleware.ts — /invite/* made public so the preview screen renders
+    before sign-in.
+  - components/auth/LoginForm.tsx + SignupForm.tsx — now respect a
+    redirectTo query param (Google OAuth path too, via /auth/callback's
+    existing next param) so signing in from an invite link returns you to
+    it. app/(auth)/login and signup page.tsx wrapped in Suspense — required
+    by Next.js for useSearchParams() in a statically-prerendered page,
+    caught by npm run build.
+  - lib/permissions/projectPermissions.ts — canManageInvites,
+    canReviewAccessRequests, canModifyMemberRow (mirrors DB trigger rules).
+
+NOT BUILT (deliberate scope cuts, not oversights)
+  - Notifications for request/approval/rejection: the notifications table's
+    type column is CHECK-constrained to 5 existing values with no room for
+    an access-request type. Adding one needs its own migration; left as a
+    clean TODO rather than shoehorned into an existing type or faked.
+  - Ownership transfer: the member role-change dropdown excludes 'owner' —
+    transferring ownership is a bigger, separate decision than a role edit.
+  - redirectTo isn't carried through email/password signup's email-
+    confirmation step (only through Google OAuth and password login) —
+    would require touching more of the shared auth/check-email flow than
+    this step's scope justified.
+  - Full audit-trail page — a small "recent activity" list lives inside
+    the share modal instead, per "do not overbuild."
+
+LIVE VERIFICATION (real authenticated sessions throughout; service role
+used only for read-only snapshots and for deleting project_invites/
+project_access_requests rows this test created — those two tables have no
+DELETE policy for any role, same as the rest of the schema; every actual
+project delete went through the owner's own real session, which is also
+what exercises item 9 for real):
+  A.  ✅ owner creates invite link
+  B.  ✅ raw token is NOT stored — token_hash confirmed to be the SHA-256
+      digest, not the raw token; checked the full invite row AND the
+      audit_events entries for it, raw token absent from both
+  C.  ✅ invite link opens — preview RPC succeeds for a true anonymous
+      client (no session at all), returns only safe fields
+  D.  ✅ unsigned visitor's redeem attempt is rejected outright ("Must be
+      signed in to redeem an invite")
+  E.  ✅ signed-in user can request access (approval_required=true ->
+      pending_created)
+  F.  ✅ owner/manager can see the pending request
+  G.  ✅ owner/manager can approve
+  H.  ✅ approved user becomes an active project_members row with the
+      correct role; used_count incremented at approval time, not request
+      time
+  I.  ✅ approved user can now SELECT the project
+  J.  ✅ rejected user gets no project_members row and still can't see
+      the project (separate project, since a user can only have one
+      access-request row per project)
+  K.  ✅ revoked link's preview shows revoked; redeem attempt returns
+      invalid/revoked
+  L.  ✅ same for an expired link (expires_at in the past)
+  M.  ✅ same for a maxed-out link (used_count >= max_uses)
+  N.  ✅ viewer, commenter, and editor are each rejected by RLS attempting
+      to create an invite (42501); manager, in contrast, succeeds —
+      confirming the restriction is role-scoped, not a blanket failure
+  O.  ✅ cross-user isolation on a fresh, fully unrelated project: can't
+      list its invites, can't list its access requests, can't see the
+      project itself. (The preview RPC does work for a non-member — by
+      design, invite links must be previewable before you have any
+      relationship to the project — but it reveals only the same safe
+      fields, never token_hash or anything else.)
+  P.  ✅ audit_events covers project_invites INSERT/UPDATE, project_access_
+      requests INSERT/UPDATE, and project_members INSERT (the approval-
+      triggered one)
+  Q.  ✅ cleanup used only exact ids captured during the run — no ilike,
+      no wildcards, no name-pattern matching, no service-role delete
+      against any table with an owner-scoped DELETE policy. First pass hit
+      the 022 cascade bug (see above); after 023, full retry succeeded and
+      the database was confirmed byte-identical to its pre-test state:
+      0 projects, 0 project_members, 0 project_invites, 0
+      project_access_requests, workspaces/workspace_members unchanged.
+
+  TOTAL: 55/55 checks passing (42 in the first pass + 13 confirming the
+  023 fix and completing cleanup).
+
+BOTTOM LINE
+  Step 21B is complete and safe. RLS was tightened during this step (one
+  real privilege-escalation bug fixed, one real gap closed) and never
+  weakened — no client code uses the service role, and no RLS policy was
+  bypassed to make anything work.
+```
+
+---
+
 ## 🚧 KNOWN ISSUES
 
 | # | Issue | Step | Severity | Status |
@@ -783,6 +940,8 @@ TESTING — live verification results (2026-07-09, post-021)
 | 5 | Live production DB: deleting a project threw `insert or update on table "audit_events" violates foreign key constraint "audit_events_project_id_fkey"`. Fixed by 019 — confirmed via service-role delete (RLS bypassed, matching how the bug was originally found) that both a project with children and one with members/invites/access_requests/comments now delete cleanly with no FK error. **Fixed and verified.** | 21A verification | Medium | ✅ Fixed and verified |
 | 6 | Live production DB: there is no RLS DELETE policy on `projects` for the `authenticated` role at all — not added by 018, and never existed in 013/000 either. A real user's delete (even the project owner) silently affects 0 rows (no error, just doesn't delete) because RLS default-denies with no matching policy. Only discovered because service-role deletes (which bypass RLS) were used to verify issue #5. Not part of the original Step 21A spec (which only specified view/insert/update authorization), but flagging since "who can delete a project" needs an explicit answer before Step 21B ships a delete button. | 21A verification | Medium | ⬜ Not fixed — needs a product decision (who can delete a project?) before adding the policy |
 | 7 | **Incident (self-inflicted, during verification cleanup):** a cleanup script used `.ilike('name', '__%')` intending to match test-data names starting with a literal double-underscore. In SQL `LIKE`/`ILIKE`, `_` is a single-character wildcard, not a literal — so `__%` matched *any* name of 2+ characters, including both real workspaces ("Regalbay Property Management" and "Marvin"), and the script deleted them via the service-role client (bypasses RLS). **Caught immediately** via a full row-count audit across every table right after. Restored both workspaces and their workspace_members rows with their exact original `id`, `name`, `owner_id`, `role`, and `joined_at` (all captured earlier in the same session from prior read-only queries) — full audit confirmed no other table was affected (projects/tasks/etc. were all correctly empty before and after, matching pre-verification state). **Two fields could not be restored exactly** because they were never read before deletion: `workspaces.slug` (guessed as `regalbay-property-management` / `marvin`) and `workspaces.created_at`/`updated_at` (now stamped at restoration time instead of the true original creation date, ~2026-06-08/09). `logo_url` and `plan` were restored as `null`/`'free'`, which matches what every prior query showed. Marvin should check Settings → Workspace for both workspaces to confirm name/logo look right, and mention it if the slug is used anywhere (e.g. a shareable link) that depended on its exact original value. | 21A verification | **High (data)** | ✅ Restored (see caveats above) |
+| 8 | **Privilege escalation (found and fixed before ever being exploitable):** the Step 21A UPDATE policy on `project_access_requests` had `USING (user_id = auth.uid() OR can_manage_project(project_id))` with no `WITH CHECK`. Postgres reuses `USING` as the check when none is given, so a requester could update their own row and set `status = 'approved'` directly — self-approving. Harmless in isolation (nothing consumed that status transition yet), but Step 21B adds a trigger that auto-grants `project_members` on approval, which would have turned this into a real, exploitable escalation. Fixed in migration 022 before that trigger went live: self-service UPDATE removed entirely (only owner/manager can move a request to approved/rejected), and INSERT now forces `status = 'pending'` so a request can never be created already-approved either. | 21B | **High** | ✅ Fixed in 022, verified live |
+| 9 | Migration 022's `enforce_project_member_rules()` trigger fires on the cascading delete of `project_members` when a project is deleted, and its "don't remove the last owner" check couldn't tell that apart from a standalone removal — briefly regressing 021's owner-hard-delete (blocked with "Cannot remove the last active owner of a project" for every project, no exceptions). Found immediately during Step 21B's live verification (4 test-cleanup deletes failed). Fixed in migration 023 by checking whether the parent project row still exists before enforcing the owner rules — same technique as the 019 audit_events cascade fix. Re-verified: owner hard-delete works normally again. | 21B | Medium | ✅ Fixed in 023, verified live |
 
 ---
 
@@ -827,6 +986,7 @@ TESTING — live verification results (2026-07-09, post-021)
 | 2026-07-09 | Step 21A re-verification (3rd pass) | Migration 020 applied by Marvin. Project creation is STILL broken — identical 42501 error, now the third consecutive fix attempt to fail the same way. Since two structurally different policy definitions (raw subquery, then SECURITY DEFINER function) both fail identically, root cause is very likely NOT the policy logic itself. Stopped guessing further; need Marvin to run a read-only `pg_policies` diagnostic query (given in Known Issue #4) before another attempt. Cleanup discipline tightened this round per explicit instruction — exact-id ledger only, no ilike/wildcards; since item 1 failed immediately, nothing was created and nothing needed cleanup. Confirmed via full snapshot: workspaces/workspace_members completely untouched (read-only this round), DB state identical before and after. |
 | 2026-07-09 | Step 21A — root cause found, fixed, fully verified | Marvin ran a sequence of read-only diagnostics (pg_policies, pg_proc ownership, pg_proc overloads, direct RPC call, a rolled-back DO block simulating the real JWT) that progressively ruled out the policy, the functions, their ownership, overloading, and even Postgres/RLS itself — a manual insert in the simulated session succeeded. That isolated the real variable: every prior test had requested `RETURNING` (`.select()`), and `RETURNING` races the AFTER INSERT trigger's SELECT-policy dependency. Confirmed by testing `Prefer: return=minimal` (no RETURNING): succeeded immediately. Fixed in app/(app)/projects/page.tsx — pre-generate id client-side, insert without `.select()`, separate follow-up fetch. No further migration needed. Re-verified all 10 originally-requested items end-to-end using the app's real new insert pattern through real authenticated sessions: **25/25 checks passing.** Step 21A is now fully safe. Ready for Step 21B. |
 | 2026-07-09 | Step 21A.1 — archive/delete hardening, built and fully verified | Built per explicit decision: archiving is the default reversible action, hard delete is owner-only and not exposed in the UI. Migration 021 adds archived_at/archived_by/archive_reason, can_own_project(), a BEFORE UPDATE trigger enforcing owner-only archive/restore (managers keep general edit rights), an owner-only DELETE policy (resolves Known Issue #6), and ARCHIVE/RESTORE audit labeling. Applied by Marvin, then verified live using only real authenticated sessions for every write (service role was read-only this round) — cleanup doubled as the actual "owner can hard-delete" test rather than a separate wipe. **39/39 security-relevant checks passed.** Two test-script assertions initially read as failures (editor/viewer archive attempts) turned out to be a false negative in the test's expectations, not a security gap: editor/viewer are blocked one layer earlier (the general update policy silently matches 0 rows) rather than by the trigger's explicit exception (which is what blocks manager) — same outcome, different mechanism. No real workspace/user records touched. Step 21A.1 is safe. Ready for Step 21B. |
+| 2026-07-09 | Step 21B — invite/approval UI, built and fully verified | Built the full invite-link + approval + member-management system: ProjectShareModal, ProjectAccessRequests, ProjectMembersPanel, the /invite/project/[token] landing page, and lib/invites/projectInvites.ts (client-side Web Crypto token generation/hashing — only SHA-256 hash ever reaches the DB). Reviewed RLS before writing UI code per instruction and found a real one: the Step 21A access-request UPDATE policy had no WITH CHECK, letting a requester self-approve — harmless until this step's approval-triggered auto-membership grant would have made it exploitable. Fixed in migration 022 before that trigger went live. Also added owner-protection on project_members (manager can't touch an owner's row, no path to zero owners) and two SECURITY DEFINER RPCs (get_invite_status, redeem_project_invite) so the invite-preview/redeem flow never needs service-role or broadened RLS. Live verification's first pass (42/48) caught a real regression: the new owner-protection trigger also fired during a project's cascade-delete of its own project_members, blocking all project hard-deletion. Fixed same-day in migration 023 (mirrors the 019 audit_events cascade fix), re-verified: **55/55 checks passing total.** No real workspace/user data touched; cleanup used exact ids only, service role used solely for read-only snapshots and deleting this test's own project_invites/project_access_requests rows (tables with no DELETE policy for any role). Step 21B is safe. Not yet committed to git. |
 
 ---
 
