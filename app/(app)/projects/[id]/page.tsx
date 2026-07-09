@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, LayoutGrid, List, ArrowLeft, Share2, History, User } from 'lucide-react'
+import { Loader2, LayoutGrid, List, ArrowLeft, Share2, History, User, Target, LayoutDashboard } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import { canManageInvites, canViewAuditTrail } from '@/lib/permissions/projectPermissions'
@@ -11,7 +11,9 @@ import BoardView from '@/components/projects/BoardView'
 import ListView from '@/components/projects/ListView'
 import ProjectShareModal from '@/components/projects/ProjectShareModal'
 import ProjectAuditTrail from '@/components/projects/ProjectAuditTrail'
-import type { Project, Column, Task, Profile, ProjectRole } from '@/types'
+import ProjectGoals from '@/components/projects/ProjectGoals'
+import ProjectOverview from '@/components/projects/ProjectOverview'
+import type { Project, Column, Task, Profile, ProjectRole, ProjectGoal } from '@/types'
 
 export default function ProjectPage({ params }: { params: { id: string } }) {
   const [project, setProject] = useState<Project | null>(null)
@@ -21,7 +23,8 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const [userProfile, setUserProfile] = useState<Profile | null>(null)
   const [profileMap, setProfileMap] = useState<Record<string, Profile>>({})
   const [projectRole, setProjectRole] = useState<ProjectRole | null>(null)
-  const [view, setView] = useState<'board' | 'list' | 'activity'>('board')
+  const [goals, setGoals] = useState<ProjectGoal[]>([])
+  const [view, setView] = useState<'overview' | 'board' | 'list' | 'goals' | 'activity'>('overview')
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
@@ -36,7 +39,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       if (!user) return
       setUserId(user.id)
 
-      const [profileRes, memberRes, projectRes, columnsRes, tasksRes, roleRes, assigneesRes] = await Promise.all([
+      const [profileRes, memberRes, projectRes, columnsRes, tasksRes, roleRes, assigneesRes, goalsRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('workspace_members').select('workspace_id').eq('user_id', user.id).single(),
         supabase.from('projects').select('*').eq('id', params.id).single(),
@@ -44,6 +47,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
         supabase.from('tasks').select('*').eq('project_id', params.id).eq('is_personal', false).is('parent_task_id', null).order('position'),
         supabase.from('project_members').select('role').eq('project_id', params.id).eq('user_id', user.id).eq('status', 'active').maybeSingle(),
         supabase.from('task_assignees').select('task_id, user_id').eq('project_id', params.id),
+        supabase.from('project_goals').select('*').eq('project_id', params.id).order('sort_order').order('created_at'),
       ])
 
       if (roleRes.data) setProjectRole(roleRes.data.role as ProjectRole)
@@ -63,6 +67,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       setProject(projectRes.data as Project)
       setColumns((columnsRes.data ?? []) as Column[])
       setTasks((tasksRes.data ?? []) as Task[])
+      setGoals((goalsRes.data ?? []) as ProjectGoal[])
 
       const map: Record<string, string[]> = {}
       for (const row of (assigneesRes.data ?? []) as { task_id: string; user_id: string }[]) {
@@ -111,6 +116,44 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
     return () => { supabase.removeChannel(channel) }
   }, [params.id])
 
+  // Realtime: keep the page-level tasks list (used by Overview and Goals,
+  // which — unlike BoardView/ListView — don't have their own task-focused
+  // realtime subscription) in sync with completions/moves/goal links made
+  // from any tab. Separate channel name from useRealtime's own
+  // `project:{id}:tasks` subscription used inside BoardView.
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`project:${params.id}:tasks:overview`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'tasks', filter: `project_id=eq.${params.id}` },
+        (payload) => {
+          const task = payload.new as Task
+          setTasks(prev => prev.some(t => t.id === task.id) ? prev : [...prev, task])
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `project_id=eq.${params.id}` },
+        (payload) => {
+          const task = payload.new as Task
+          setTasks(prev => prev.map(t => t.id === task.id ? task : t))
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'tasks' },
+        (payload) => {
+          const id = (payload.old as { id: string }).id
+          setTasks(prev => prev.filter(t => t.id !== id))
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [params.id])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -118,6 +161,8 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       </div>
     )
   }
+
+  const goalTitleMap: Record<string, string> = Object.fromEntries(goals.map(g => [g.id, g.title]))
 
   if (notFound) {
     return (
@@ -156,7 +201,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           </button>
         )}
         {/* My tasks toggle */}
-        {view !== 'activity' && (
+        {(view === 'board' || view === 'list') && (
           <button
             onClick={() => setMyTasksOnly(v => !v)}
             className={cn(
@@ -168,32 +213,48 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
             <span className="hidden sm:inline">My tasks</span>
           </button>
         )}
-        {/* View toggle */}
-        <div className="flex items-center bg-hover rounded-lg p-1 gap-1 flex-shrink-0">
-          <button
-            onClick={() => setView('board')}
-            className={cn('w-8 h-8 flex items-center justify-center rounded-md transition-colors', view === 'board' ? 'bg-card text-primary shadow-sm' : 'text-muted hover:text-secondary')}
-          >
-            <LayoutGrid size={15} />
-          </button>
-          <button
-            onClick={() => setView('list')}
-            className={cn('w-8 h-8 flex items-center justify-center rounded-md transition-colors', view === 'list' ? 'bg-card text-primary shadow-sm' : 'text-muted hover:text-secondary')}
-          >
-            <List size={15} />
-          </button>
-          {canViewAuditTrail(projectRole) && (
-            <button
-              onClick={() => setView('activity')}
-              className={cn('w-8 h-8 flex items-center justify-center rounded-md transition-colors', view === 'activity' ? 'bg-card text-primary shadow-sm' : 'text-muted hover:text-secondary')}
-            >
-              <History size={15} />
-            </button>
-          )}
-        </div>
       </div>
 
-      {/* Board / List / Activity */}
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-5 overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 lg:mx-0 lg:px-0">
+        <button
+          onClick={() => setView('overview')}
+          className={cn('flex items-center gap-1.5 flex-shrink-0 px-3 py-2 rounded-lg text-sm transition-colors', view === 'overview' ? 'bg-hover text-primary font-medium' : 'text-muted hover:text-secondary')}
+        >
+          <LayoutDashboard size={14} /> Overview
+        </button>
+        <button
+          onClick={() => setView('board')}
+          className={cn('flex items-center gap-1.5 flex-shrink-0 px-3 py-2 rounded-lg text-sm transition-colors', view === 'board' ? 'bg-hover text-primary font-medium' : 'text-muted hover:text-secondary')}
+        >
+          <LayoutGrid size={14} /> Board
+        </button>
+        <button
+          onClick={() => setView('list')}
+          className={cn('flex items-center gap-1.5 flex-shrink-0 px-3 py-2 rounded-lg text-sm transition-colors', view === 'list' ? 'bg-hover text-primary font-medium' : 'text-muted hover:text-secondary')}
+        >
+          <List size={14} /> List
+        </button>
+        <button
+          onClick={() => setView('goals')}
+          className={cn('flex items-center gap-1.5 flex-shrink-0 px-3 py-2 rounded-lg text-sm transition-colors', view === 'goals' ? 'bg-hover text-primary font-medium' : 'text-muted hover:text-secondary')}
+        >
+          <Target size={14} /> Goals
+        </button>
+        {canViewAuditTrail(projectRole) && (
+          <button
+            onClick={() => setView('activity')}
+            className={cn('flex items-center gap-1.5 flex-shrink-0 px-3 py-2 rounded-lg text-sm transition-colors', view === 'activity' ? 'bg-hover text-primary font-medium' : 'text-muted hover:text-secondary')}
+          >
+            <History size={14} /> Activity
+          </button>
+        )}
+      </div>
+
+      {/* Overview / Board / List / Goals / Activity */}
+      {view === 'overview' && (
+        <ProjectOverview tasks={tasks} goals={goals} assigneesMap={assigneesMap} userId={userId ?? ''} />
+      )}
       {view === 'board' && (
         <BoardView
           columns={columns}
@@ -205,6 +266,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           assigneesMap={assigneesMap}
           myTasksOnly={myTasksOnly}
           projectRole={projectRole}
+          goalTitleMap={goalTitleMap}
         />
       )}
       {view === 'list' && (
@@ -217,6 +279,18 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           assigneesMap={assigneesMap}
           myTasksOnly={myTasksOnly}
           projectRole={projectRole}
+          goalTitleMap={goalTitleMap}
+        />
+      )}
+      {view === 'goals' && userId && (
+        <ProjectGoals
+          projectId={params.id}
+          userId={userId}
+          userProfile={userProfile}
+          projectRole={projectRole}
+          tasks={tasks}
+          profileMap={profileMap}
+          onTaskUpdated={updated => setTasks(prev => prev.map(t => t.id === updated.id ? updated : t))}
         />
       )}
       {view === 'activity' && canViewAuditTrail(projectRole) && (

@@ -8,6 +8,10 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils/cn'
 import { createProjectInvite, revokeProjectInvite } from '@/lib/invites/projectInvites'
+import { fetchProfilesByIds } from '@/lib/utils/profiles'
+import { fetchTaskTitlesByIds } from '@/lib/utils/taskTitles'
+import { fetchGoalTitlesByIds } from '@/lib/utils/goalTitles'
+import { formatAuditEvent, collectAuditEventUserIds, collectAuditEventTaskIds, collectAuditEventGoalIds } from '@/lib/audit/formatAuditEvent'
 import ProjectAccessRequests from './ProjectAccessRequests'
 import ProjectMembersPanel from './ProjectMembersPanel'
 import type { ProjectInvite, ProjectInviteRole, ProjectRole, AuditEvent } from '@/types'
@@ -51,6 +55,9 @@ export default function ProjectShareModal({ projectId, projectName, currentUserI
   const [loadingInvites, setLoadingInvites] = useState(true)
   const [pendingCount, setPendingCount] = useState(0)
   const [recentActivity, setRecentActivity] = useState<AuditEvent[]>([])
+  const [activityNameMap, setActivityNameMap] = useState<Record<string, string>>({})
+  const [activityTaskMap, setActivityTaskMap] = useState<Record<string, string>>({})
+  const [activityGoalMap, setActivityGoalMap] = useState<Record<string, string>>({})
 
   const [defaultRole, setDefaultRole] = useState<ProjectInviteRole>('editor')
   const [approvalRequired, setApprovalRequired] = useState(true)
@@ -89,7 +96,23 @@ export default function ProjectShareModal({ projectId, projectName, currentUserI
       .eq('project_id', projectId)
       .order('created_at', { ascending: false })
       .limit(8)
-    setRecentActivity((data ?? []) as AuditEvent[])
+    const rows = (data ?? []) as AuditEvent[]
+    setRecentActivity(rows)
+
+    const userIds = Array.from(new Set(rows.flatMap(collectAuditEventUserIds)))
+    const profiles = await fetchProfilesByIds(supabase, userIds)
+    const names: Record<string, string> = {}
+    for (const id of userIds) {
+      const p = profiles[id]
+      names[id] = p?.full_name || p?.email || `User ${id.slice(0, 8)}`
+    }
+    setActivityNameMap(names)
+
+    const taskIds = Array.from(new Set(rows.flatMap(collectAuditEventTaskIds)))
+    setActivityTaskMap(await fetchTaskTitlesByIds(supabase, taskIds))
+
+    const goalIds = Array.from(new Set(rows.flatMap(collectAuditEventGoalIds)))
+    setActivityGoalMap(await fetchGoalTitlesByIds(supabase, goalIds))
   }, [projectId])
 
   useEffect(() => {
@@ -337,11 +360,19 @@ export default function ProjectShareModal({ projectId, projectName, currentUserI
               <div className="border-t border-[var(--border)] pt-4">
                 <p className="text-xs text-secondary mb-2">Recent activity</p>
                 <div className="space-y-1.5">
-                  {recentActivity.map(ev => (
-                    <p key={ev.id} className="text-[11px] text-muted">
-                      <span className="text-secondary">{ev.entity_type}</span> {ev.action.toLowerCase()} · {format(new Date(ev.created_at), 'MMM d, HH:mm')}
-                    </p>
-                  ))}
+                  {recentActivity.map(ev => {
+                    const formatted = formatAuditEvent(
+                      ev,
+                      id => (id ? activityNameMap[id] ?? `User ${id.slice(0, 8)}` : 'Unknown user'),
+                      id => (id ? activityTaskMap[id] ?? 'a task' : 'a task'),
+                      id => (id ? activityGoalMap[id] ?? 'a goal' : 'a goal')
+                    )
+                    return (
+                      <p key={ev.id} className="text-[11px] text-muted">
+                        <span className="text-secondary">{formatted.title}</span> · {format(new Date(ev.created_at), 'MMM d, HH:mm')}
+                      </p>
+                    )
+                  })}
                 </div>
               </div>
             )}

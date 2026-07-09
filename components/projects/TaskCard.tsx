@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { motion } from 'framer-motion'
-import { Calendar, MessageSquare, MoreVertical } from 'lucide-react'
+import { Calendar, MessageSquare, MoreVertical, Target } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { cn } from '@/lib/utils/cn'
 import { getDueDateStatus } from '@/lib/utils/dueDate'
@@ -20,9 +20,10 @@ interface TaskCardProps {
   profileMap?: Record<string, Profile>
   assigneeIds?: string[]
   index?: number
+  goalTitle?: string
 }
 
-const TaskCard = memo(function TaskCard({ task, onClick, onMoveToColumn, columns, profileMap, assigneeIds, index = 0 }: TaskCardProps) {
+const TaskCard = memo(function TaskCard({ task, onClick, onMoveToColumn, columns, profileMap, assigneeIds, index = 0, goalTitle }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
 
   const isDone = task.status === 'done'
@@ -57,6 +58,14 @@ const TaskCard = memo(function TaskCard({ task, onClick, onMoveToColumn, columns
           {task.title}
         </p>
       </div>
+
+      {/* Goal */}
+      {goalTitle && (
+        <div className="flex items-center gap-1 mb-2 text-[10px] text-gold">
+          <Target size={9} />
+          <span className="truncate">{goalTitle}</span>
+        </div>
+      )}
 
       {/* Labels */}
       {task.labels?.length > 0 && (

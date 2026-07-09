@@ -18,9 +18,10 @@ interface BoardColumnProps {
   profileMap?: Record<string, Profile>
   assigneesMap?: Record<string, string[]>
   canEdit?: boolean
+  goalTitleMap?: Record<string, string>
 }
 
-export default function BoardColumn({ column, tasks, allColumns, onTaskClick, onAddTask, onMoveTask, profileMap, assigneesMap, canEdit = true }: BoardColumnProps) {
+export default function BoardColumn({ column, tasks, allColumns, onTaskClick, onAddTask, onMoveTask, profileMap, assigneesMap, canEdit = true, goalTitleMap }: BoardColumnProps) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -78,6 +79,7 @@ export default function BoardColumn({ column, tasks, allColumns, onTaskClick, on
               profileMap={profileMap}
               assigneeIds={assigneesMap?.[task.id]}
               index={i}
+              goalTitle={task.goal_id ? goalTitleMap?.[task.goal_id] : undefined}
             />
           ))}
         </SortableContext>

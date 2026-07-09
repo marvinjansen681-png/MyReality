@@ -25,9 +25,10 @@ interface BoardViewProps {
   assigneesMap?: Record<string, string[]>
   myTasksOnly?: boolean
   projectRole?: ProjectRole | null
+  goalTitleMap?: Record<string, string>
 }
 
-export default function BoardView({ columns, initialTasks, userId, userProfile, projectId, profileMap, assigneesMap, myTasksOnly = false, projectRole = null }: BoardViewProps) {
+export default function BoardView({ columns, initialTasks, userId, userProfile, projectId, profileMap, assigneesMap, myTasksOnly = false, projectRole = null, goalTitleMap }: BoardViewProps) {
   const [tasks, setTasks] = useState(initialTasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [dragging, setDragging] = useState<Task | null>(null)
@@ -174,6 +175,7 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
               profileMap={profileMap}
               assigneesMap={assigneesMap}
               canEdit={canEdit}
+              goalTitleMap={goalTitleMap}
             />
           ))}
         </div>
@@ -189,6 +191,7 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
           profileMap={profileMap}
           assigneesMap={assigneesMap}
           canEdit={canEdit}
+          goalTitleMap={goalTitleMap}
         />
 
         <DragOverlay>
@@ -222,7 +225,7 @@ function columnStatusMap(columnId: string, columns: Column[]): Task['status'] {
   return 'todo'
 }
 
-function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onMoveTask, profileMap, assigneesMap, canEdit }: {
+function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onMoveTask, profileMap, assigneesMap, canEdit, goalTitleMap }: {
   columns: Column[]
   tasks: Task[]
   colMeta: { id: string; title: string }[]
@@ -232,6 +235,7 @@ function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onM
   profileMap?: Record<string, Profile>
   assigneesMap?: Record<string, string[]>
   canEdit: boolean
+  goalTitleMap?: Record<string, string>
 }) {
   const [activeColIdx, setActiveColIdx] = useState(0)
   const activeCol = columns[activeColIdx]
@@ -271,6 +275,7 @@ function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onM
             profileMap={profileMap}
             assigneeIds={assigneesMap?.[task.id]}
             index={i}
+            goalTitle={task.goal_id ? goalTitleMap?.[task.goal_id] : undefined}
           />
         ))}
         {canEdit && <MobileAddCard columnId={activeCol.id} onAdd={onAddTask} />}

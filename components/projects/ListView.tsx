@@ -23,9 +23,10 @@ interface ListViewProps {
   assigneesMap?: Record<string, string[]>
   myTasksOnly?: boolean
   projectRole?: ProjectRole | null
+  goalTitleMap?: Record<string, string>
 }
 
-export default function ListView({ initialTasks, columns, userId, userProfile, profileMap, assigneesMap, myTasksOnly = false, projectRole = null }: ListViewProps) {
+export default function ListView({ initialTasks, columns, userId, userProfile, profileMap, assigneesMap, myTasksOnly = false, projectRole = null, goalTitleMap }: ListViewProps) {
   const [tasks, setTasks] = useState(initialTasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const canEdit = canEditProjectContent(projectRole)
@@ -58,6 +59,7 @@ export default function ListView({ initialTasks, columns, userId, userProfile, p
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Title</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Priority</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Column</th>
+              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Goal</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Due</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Labels</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Assignees</th>
@@ -90,6 +92,9 @@ export default function ListView({ initialTasks, columns, userId, userProfile, p
                 </td>
                 <td className="py-2.5 px-3 text-xs text-secondary">
                   {task.column_id ? colMap[task.column_id] ?? '—' : '—'}
+                </td>
+                <td className="py-2.5 px-3 text-xs text-gold">
+                  {task.goal_id ? goalTitleMap?.[task.goal_id] ?? '—' : '—'}
                 </td>
                 <td className={cn(
                   'py-2.5 px-3 text-xs',
@@ -154,6 +159,9 @@ export default function ListView({ initialTasks, columns, userId, userProfile, p
                   )}
                   {task.column_id && (
                     <span className="text-xs text-muted">{colMap[task.column_id]}</span>
+                  )}
+                  {task.goal_id && goalTitleMap?.[task.goal_id] && (
+                    <span className="text-xs text-gold">{goalTitleMap[task.goal_id]}</span>
                   )}
                   {profileMap && <AssigneeAvatars ids={assigneesMap?.[task.id] ?? []} profileMap={profileMap} />}
                 </div>

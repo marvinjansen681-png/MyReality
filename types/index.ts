@@ -11,6 +11,8 @@ export type ProjectRole = 'owner' | 'manager' | 'editor' | 'commenter' | 'viewer
 export type ProjectMemberStatus = 'active' | 'removed' | 'pending'
 export type ProjectInviteRole = 'manager' | 'editor' | 'commenter' | 'viewer'
 export type ProjectAccessRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+export type ProjectGoalStatus = 'active' | 'completed' | 'archived'
+export type ProjectGoalPriority = 'low' | 'medium' | 'high' | 'urgent'
 
 export interface Profile {
   id: string
@@ -101,6 +103,35 @@ export interface ProjectAccessRequest {
   profile?: Profile
 }
 
+export interface ProjectGoal {
+  id: string
+  project_id: string
+  title: string
+  description: string | null
+  status: ProjectGoalStatus
+  priority: ProjectGoalPriority
+  due_date: string | null
+  completed_at: string | null
+  completed_by: string | null
+  sort_order: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  task_count?: number
+  completed_task_count?: number
+}
+
+export interface ProjectGoalComment {
+  id: string
+  goal_id: string
+  project_id: string
+  user_id: string
+  content: string
+  created_at: string
+  updated_at: string
+  profile?: Profile
+}
+
 export interface TaskAssignee {
   id: string
   task_id: string
@@ -151,6 +182,7 @@ export interface Task {
   estimated_hours: number | null
   actual_hours: number | null
   parent_task_id: string | null
+  goal_id: string | null
   is_personal: boolean
   deleted_at: string | null
   deleted_by: string | null

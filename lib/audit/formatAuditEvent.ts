@@ -1,6 +1,6 @@
 import type { AuditEvent, TaskStatus, TaskPriority, ProjectRole } from '@/types'
 
-export type AuditCategory = 'project' | 'tasks' | 'members' | 'invites' | 'requests' | 'other'
+export type AuditCategory = 'project' | 'tasks' | 'members' | 'invites' | 'requests' | 'goals' | 'other'
 
 export interface FormattedAuditEvent {
   title: string
@@ -39,10 +39,34 @@ export function collectAuditEventUserIds(event: AuditEvent): string[] {
 // caller resolves these the same way it resolves user ids (a small separate
 // lookup), and passes the result in via getTaskTitle.
 export function collectAuditEventTaskIds(event: AuditEvent): string[] {
-  if (event.entity_type !== 'task_assignees') return []
+  const ids: (string | null | undefined)[] = []
+  if (event.entity_type === 'task_assignees') {
+    const newData = event.new_data as Record<string, unknown> | null
+    const oldData = event.old_data as Record<string, unknown> | null
+    ids.push(readString(newData, 'task_id'), readString(oldData, 'task_id'))
+  }
+  if (event.entity_type === 'tasks') {
+    ids.push(readString(event.new_data as Record<string, unknown> | null, 'id'), readString(event.old_data as Record<string, unknown> | null, 'id'))
+  }
+  return ids.filter((id): id is string => !!id)
+}
+
+// project_goals/project_goal_comments audit rows carry goal_id (or id, for
+// the goal's own row) but not its title — resolved the same way task titles
+// are, via a small separate lookup passed in as getGoalTitle.
+export function collectAuditEventGoalIds(event: AuditEvent): string[] {
   const newData = event.new_data as Record<string, unknown> | null
   const oldData = event.old_data as Record<string, unknown> | null
-  const ids = [readString(newData, 'task_id'), readString(oldData, 'task_id')]
+  const ids: (string | null | undefined)[] = []
+  if (event.entity_type === 'project_goals') {
+    ids.push(readString(newData, 'id'), readString(oldData, 'id'))
+  }
+  if (event.entity_type === 'project_goal_comments') {
+    ids.push(readString(newData, 'goal_id'), readString(oldData, 'goal_id'))
+  }
+  if (event.entity_type === 'tasks') {
+    ids.push(readString(newData, 'goal_id'), readString(oldData, 'goal_id'))
+  }
   return ids.filter((id): id is string => !!id)
 }
 
@@ -55,7 +79,12 @@ function truncate(text: string, max: number): string {
   return text.length > max ? text.slice(0, max - 1) + '…' : text
 }
 
-export function formatAuditEvent(event: AuditEvent, getName: NameResolver, getTaskTitle: NameResolver = () => 'a task'): FormattedAuditEvent {
+export function formatAuditEvent(
+  event: AuditEvent,
+  getName: NameResolver,
+  getTaskTitle: NameResolver = () => 'a task',
+  getGoalTitle: NameResolver = () => 'a goal'
+): FormattedAuditEvent {
   const actor = getName(event.actor_id)
   const newData = event.new_data as Record<string, unknown> | null
   const oldData = event.old_data as Record<string, unknown> | null
@@ -64,7 +93,7 @@ export function formatAuditEvent(event: AuditEvent, getName: NameResolver, getTa
     case 'projects':
       return formatProjectEvent(event, actor, oldData, newData)
     case 'tasks':
-      return formatTaskEvent(event, actor, oldData, newData)
+      return formatTaskEvent(event, actor, oldData, newData, getGoalTitle)
     case 'task_comments':
       return formatTaskCommentEvent(event, actor, newData)
     case 'task_assignees':
@@ -75,6 +104,10 @@ export function formatAuditEvent(event: AuditEvent, getName: NameResolver, getTa
       return formatProjectInviteEvent(event, actor, oldData, newData)
     case 'project_access_requests':
       return formatAccessRequestEvent(event, actor, getName, oldData, newData)
+    case 'project_goals':
+      return formatProjectGoalEvent(event, actor, oldData, newData)
+    case 'project_goal_comments':
+      return formatGoalCommentEvent(event, actor, getGoalTitle, newData)
     default:
       return { title: `${actor} performed ${event.action.toLowerCase()} on ${event.entity_type}`, detail: null, category: 'other' }
   }
@@ -120,7 +153,8 @@ function formatProjectEvent(
 }
 
 function formatTaskEvent(
-  event: AuditEvent, actor: string, oldData: Record<string, unknown> | null, newData: Record<string, unknown> | null
+  event: AuditEvent, actor: string, oldData: Record<string, unknown> | null, newData: Record<string, unknown> | null,
+  getGoalTitle: NameResolver = () => 'a goal'
 ): FormattedAuditEvent {
   const title = readString(newData, 'title') ?? readString(oldData, 'title') ?? 'a task'
 
@@ -128,6 +162,13 @@ function formatTaskEvent(
   if (event.action === 'DELETE') return { title: `${actor} deleted task "${title}"`, detail: null, category: 'tasks' }
 
   if (event.action === 'UPDATE' && oldData && newData) {
+    const oldGoalId = readString(oldData, 'goal_id')
+    const newGoalId = readString(newData, 'goal_id')
+    if (oldGoalId !== newGoalId) {
+      if (newGoalId) return { title: `${actor} moved "${title}" into goal "${getGoalTitle(newGoalId)}"`, detail: null, category: 'goals' }
+      return { title: `${actor} removed "${title}" from goal "${getGoalTitle(oldGoalId)}"`, detail: null, category: 'goals' }
+    }
+
     const oldStatus = readString(oldData, 'status') as TaskStatus | null
     const newStatus = readString(newData, 'status') as TaskStatus | null
     if (oldStatus && newStatus && oldStatus !== newStatus) {
@@ -227,6 +268,40 @@ function formatProjectInviteEvent(
     return { title: `${actor} updated an invite link`, detail: null, category: 'invites' }
   }
   return { title: `${actor} deleted an invite link`, detail: null, category: 'invites' }
+}
+
+function formatProjectGoalEvent(
+  event: AuditEvent, actor: string, oldData: Record<string, unknown> | null, newData: Record<string, unknown> | null
+): FormattedAuditEvent {
+  const title = readString(newData, 'title') ?? readString(oldData, 'title') ?? 'a goal'
+
+  if (event.action === 'INSERT') return { title: `${actor} created goal "${title}"`, detail: null, category: 'goals' }
+  if (event.action === 'COMPLETE') return { title: `${actor} completed goal "${title}"`, detail: null, category: 'goals' }
+  if (event.action === 'REOPEN') return { title: `${actor} reopened goal "${title}"`, detail: null, category: 'goals' }
+  if (event.action === 'ARCHIVE') return { title: `${actor} archived goal "${title}"`, detail: null, category: 'goals' }
+  if (event.action === 'RESTORE') return { title: `${actor} restored goal "${title}"`, detail: null, category: 'goals' }
+  if (event.action === 'DELETE') return { title: `${actor} deleted goal "${title}"`, detail: null, category: 'goals' }
+
+  const changes: string[] = []
+  if (oldData && newData) {
+    for (const field of ['title', 'description', 'priority', 'due_date'] as const) {
+      const oldVal = readString(oldData, field)
+      const newVal = readString(newData, field)
+      if (oldVal !== newVal && newVal !== null) changes.push(`${field}: "${oldVal ?? '—'}" → "${newVal}"`)
+    }
+  }
+  return { title: `${actor} updated goal "${title}"`, detail: changes.length ? changes.join(', ') : null, category: 'goals' }
+}
+
+function formatGoalCommentEvent(event: AuditEvent, actor: string, getGoalTitle: NameResolver, newData: Record<string, unknown> | null): FormattedAuditEvent {
+  const goalId = readString(newData, 'goal_id')
+  const goalTitle = getGoalTitle(goalId)
+  const content = readString(newData, 'content')
+  if (event.action === 'INSERT') {
+    return { title: `${actor} commented on goal "${goalTitle}"`, detail: content ? `"${truncate(content, 80)}"` : null, category: 'goals' }
+  }
+  if (event.action === 'DELETE') return { title: `${actor} deleted a comment on goal "${goalTitle}"`, detail: null, category: 'goals' }
+  return { title: `${actor} edited a comment on goal "${goalTitle}"`, detail: null, category: 'goals' }
 }
 
 function formatAccessRequestEvent(

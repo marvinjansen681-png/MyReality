@@ -6,7 +6,8 @@ import { Loader2, History, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fetchProfilesByIds } from '@/lib/utils/profiles'
 import { fetchTaskTitlesByIds } from '@/lib/utils/taskTitles'
-import { formatAuditEvent, collectAuditEventUserIds, collectAuditEventTaskIds, type AuditCategory } from '@/lib/audit/formatAuditEvent'
+import { fetchGoalTitlesByIds } from '@/lib/utils/goalTitles'
+import { formatAuditEvent, collectAuditEventUserIds, collectAuditEventTaskIds, collectAuditEventGoalIds, type AuditCategory } from '@/lib/audit/formatAuditEvent'
 import { cn } from '@/lib/utils/cn'
 import EmptyState from '@/components/shared/EmptyState'
 import type { AuditEvent } from '@/types'
@@ -19,6 +20,7 @@ const FILTERS: { key: AuditCategory | 'all'; label: string }[] = [
   { key: 'members', label: 'Members' },
   { key: 'invites', label: 'Invites' },
   { key: 'requests', label: 'Access requests' },
+  { key: 'goals', label: 'Goals' },
   { key: 'project', label: 'Project changes' },
 ]
 
@@ -30,6 +32,7 @@ export default function ProjectAuditTrail({ projectId }: ProjectAuditTrailProps)
   const [events, setEvents] = useState<AuditEvent[]>([])
   const [nameMap, setNameMap] = useState<Record<string, string>>({})
   const [taskTitleMap, setTaskTitleMap] = useState<Record<string, string>>({})
+  const [goalTitleMap, setGoalTitleMap] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
@@ -39,6 +42,8 @@ export default function ProjectAuditTrail({ projectId }: ProjectAuditTrailProps)
   nameMapRef.current = nameMap
   const taskTitleMapRef = useRef(taskTitleMap)
   taskTitleMapRef.current = taskTitleMap
+  const goalTitleMapRef = useRef(goalTitleMap)
+  goalTitleMapRef.current = goalTitleMap
 
   const fetchPage = useCallback(async (offset: number) => {
     const supabase = createClient()
@@ -59,17 +64,20 @@ export default function ProjectAuditTrail({ projectId }: ProjectAuditTrailProps)
     }
     const taskIds = Array.from(new Set(rows.flatMap(collectAuditEventTaskIds)))
     const titles = await fetchTaskTitlesByIds(supabase, taskIds)
-    return { rows, names, titles, more: rows.length === PAGE_SIZE }
+    const goalIds = Array.from(new Set(rows.flatMap(collectAuditEventGoalIds)))
+    const goalTitles = await fetchGoalTitlesByIds(supabase, goalIds)
+    return { rows, names, titles, goalTitles, more: rows.length === PAGE_SIZE }
   }, [projectId])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetchPage(0).then(({ rows, names, titles, more }) => {
+    fetchPage(0).then(({ rows, names, titles, goalTitles, more }) => {
       if (cancelled) return
       setEvents(rows)
       setNameMap(names)
       setTaskTitleMap(titles)
+      setGoalTitleMap(goalTitles)
       setHasMore(more)
       setLoading(false)
     })
@@ -104,6 +112,11 @@ export default function ProjectAuditTrail({ projectId }: ProjectAuditTrailProps)
             const titles = await fetchTaskTitlesByIds(supabase, missingTaskIds)
             setTaskTitleMap(prev => ({ ...prev, ...titles }))
           }
+          const missingGoalIds = collectAuditEventGoalIds(event).filter(id => !goalTitleMapRef.current[id])
+          if (missingGoalIds.length) {
+            const goalTitles = await fetchGoalTitlesByIds(supabase, missingGoalIds)
+            setGoalTitleMap(prev => ({ ...prev, ...goalTitles }))
+          }
           setEvents(prev => prev.some(e => e.id === event.id) ? prev : [event, ...prev])
         }
       )
@@ -114,10 +127,11 @@ export default function ProjectAuditTrail({ projectId }: ProjectAuditTrailProps)
 
   async function loadMore() {
     setLoadingMore(true)
-    const { rows, names, titles, more } = await fetchPage(events.length)
+    const { rows, names, titles, goalTitles, more } = await fetchPage(events.length)
     setEvents(prev => [...prev, ...rows])
     setNameMap(prev => ({ ...prev, ...names }))
     setTaskTitleMap(prev => ({ ...prev, ...titles }))
+    setGoalTitleMap(prev => ({ ...prev, ...goalTitles }))
     setHasMore(more)
     setLoadingMore(false)
   }
@@ -132,7 +146,12 @@ export default function ProjectAuditTrail({ projectId }: ProjectAuditTrailProps)
     return taskTitleMap[id] ?? 'a task'
   }
 
-  const visibleEvents = filter === 'all' ? events : events.filter(e => formatAuditEvent(e, getName, getTaskTitle).category === filter)
+  function getGoalTitle(id: string | null | undefined): string {
+    if (!id) return 'a goal'
+    return goalTitleMap[id] ?? 'a goal'
+  }
+
+  const visibleEvents = filter === 'all' ? events : events.filter(e => formatAuditEvent(e, getName, getTaskTitle, getGoalTitle).category === filter)
 
   if (loading) {
     return <div className="flex justify-center py-10"><Loader2 size={20} className="text-muted animate-spin" /></div>
@@ -160,7 +179,7 @@ export default function ProjectAuditTrail({ projectId }: ProjectAuditTrailProps)
       ) : (
         <div className="space-y-1.5">
           {visibleEvents.map(event => {
-            const formatted = formatAuditEvent(event, getName, getTaskTitle)
+            const formatted = formatAuditEvent(event, getName, getTaskTitle, getGoalTitle)
             const hasDetails = event.old_data || event.new_data
             const detailsOpen = openDetailsId === event.id
             return (

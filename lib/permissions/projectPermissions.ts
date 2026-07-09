@@ -65,3 +65,27 @@ export function canModifyMemberRow(actingRole: ProjectRole | null, targetRole: P
   if (targetRole === 'owner' && actingRole !== 'owner') return false
   return true
 }
+
+// Goals — create/edit/complete are owner/manager/editor (matching
+// can_edit_project_content and the DB's general UPDATE policy on
+// project_goals); archiving is owner/manager only (matching the
+// enforce_goal_rules DB trigger, which is the actual enforcement layer).
+export function canCreateGoal(role: ProjectRole | null): boolean {
+  return canEditProjectContent(role)
+}
+
+export function canEditGoal(role: ProjectRole | null): boolean {
+  return canEditProjectContent(role)
+}
+
+export function canCompleteGoal(role: ProjectRole | null): boolean {
+  return canEditProjectContent(role)
+}
+
+export function canArchiveGoal(role: ProjectRole | null): boolean {
+  return canManageProject(role)
+}
+
+export function canCommentOnGoal(role: ProjectRole | null): boolean {
+  return canCommentOnProject(role)
+}

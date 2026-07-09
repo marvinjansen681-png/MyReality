@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { X, Calendar, Flag, Tag, Plus, Loader2, Send, Activity, Users } from 'lucide-react'
+import { X, Calendar, Flag, Tag, Plus, Loader2, Send, Activity, Users, Target } from 'lucide-react'
 import { format, parseISO, formatDistanceToNow } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -16,7 +16,7 @@ import { canEditTaskMetadata, canAssignTask, canCommentOnProject } from '@/lib/p
 import SubtaskList from '@/components/tasks/SubtaskList'
 import PriorityBadge from '@/components/shared/PriorityBadge'
 import TaskAssigneesPanel from '@/components/projects/TaskAssigneesPanel'
-import type { Task, TaskComment, TaskActivity, TaskPriority, Profile, ProjectRole } from '@/types'
+import type { Task, TaskComment, TaskActivity, TaskPriority, Profile, ProjectRole, ProjectGoal } from '@/types'
 
 const PRIORITIES: TaskPriority[] = ['none', 'low', 'medium', 'high', 'urgent']
 const PRIORITY_LABELS: Record<TaskPriority, string> = {
@@ -36,6 +36,8 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
   const [title, setTitle] = useState('')
   const [priority, setPriority] = useState<TaskPriority>('none')
   const [dueDate, setDueDate] = useState('')
+  const [goalId, setGoalId] = useState<string>('')
+  const [goals, setGoals] = useState<ProjectGoal[]>([])
   const [labels, setLabels] = useState<string[]>([])
   const [newLabel, setNewLabel] = useState('')
   const [addingLabel, setAddingLabel] = useState(false)
@@ -70,6 +72,7 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
     setTitle(task.title)
     setPriority(task.priority)
     setDueDate(task.due_date ?? '')
+    setGoalId(task.goal_id ?? '')
     setLabels(task.labels ?? [])
     editor?.commands.setContent(task.description as Record<string, unknown> | undefined ?? '')
     loadTaskData()
@@ -92,7 +95,7 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
   async function loadTaskData() {
     if (!task) return
     const supabase = createClient()
-    const [subtasksRes, commentsRes, activityRes, assigneesRes, membersRes] = await Promise.all([
+    const [subtasksRes, commentsRes, activityRes, assigneesRes, membersRes, goalsRes] = await Promise.all([
       supabase.from('tasks').select('*').eq('parent_task_id', task.id).order('position'),
       supabase.from('task_comments').select('*').eq('task_id', task.id).order('created_at'),
       supabase.from('task_activity').select('*').eq('task_id', task.id).order('created_at', { ascending: false }).limit(20),
@@ -102,8 +105,12 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
       task.project_id
         ? supabase.from('project_members').select('user_id').eq('project_id', task.project_id).eq('status', 'active')
         : Promise.resolve({ data: [] as { user_id: string }[] }),
+      task.project_id
+        ? supabase.from('project_goals').select('*').eq('project_id', task.project_id).neq('status', 'archived').order('title')
+        : Promise.resolve({ data: [] as ProjectGoal[] }),
     ])
     if (subtasksRes.data) setSubtasks(subtasksRes.data as Task[])
+    setGoals((goalsRes.data ?? []) as ProjectGoal[])
     const commentRows = (commentsRes.data ?? []) as TaskComment[]
     const activityRows = (activityRes.data ?? []) as TaskActivity[]
     setComments(commentRows)
@@ -290,6 +297,22 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
                     />
                   </div>
                 </div>
+
+                {/* Goal */}
+                {task.project_id && (
+                  <div>
+                    <label className="text-xs text-muted mb-1.5 flex items-center gap-1 block"><Target size={11} /> Goal</label>
+                    <select
+                      value={goalId}
+                      disabled={!canEditMeta}
+                      onChange={e => { const g = e.target.value; setGoalId(g); saveField({ goal_id: g || null }) }}
+                      className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-md px-2.5 py-2 text-xs text-primary focus:outline-none focus:border-[var(--border-focus)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">No goal</option>
+                      {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
+                    </select>
+                  </div>
+                )}
 
                 {/* Assignees */}
                 {task.project_id && (
