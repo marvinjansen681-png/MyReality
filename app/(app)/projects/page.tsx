@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import React, { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -167,14 +167,14 @@ export default function ProjectsPage() {
       </main>
 
       {/* Create project modal */}
-      <AnimatePresence>
-        {modalOpen && (
-          <>
-            <motion.div className="fixed inset-0 bg-black/60 z-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setModalOpen(false)} />
+      {modalOpen && (
+          <React.Fragment key="new-project-modal">
+            <motion.div key="backdrop" className="fixed inset-0 bg-black/60 z-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => setModalOpen(false)} />
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
             <motion.div
+              key="modal-card"
               className="pointer-events-auto bg-card border border-[var(--border)] flex flex-col w-full rounded-t-2xl max-h-[90dvh] sm:rounded-xl sm:max-w-md sm:max-h-[85vh]"
-              initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '100%', opacity: 0 }}
+              initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             >
               {/* Drag handle mobile */}
@@ -241,9 +241,8 @@ export default function ProjectsPage() {
               </div>
             </motion.div>
             </div>
-          </>
+          </React.Fragment>
         )}
-      </AnimatePresence>
     </>
   )
 }
