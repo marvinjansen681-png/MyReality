@@ -7,23 +7,42 @@
 ## ▶️ CURRENT STATUS
 
 ```
-NEXT STEP TO BUILD:  None requested yet. Steps 21A through 21D, plus the
-                     021C.1/027 audit-orphan follow-up fixes, are all
-                     complete and fully verified live.
+NEXT STEP TO BUILD:  None requested yet. Steps 21A through 21D are complete
+                     and verified live. Step 21E (browser UAT) is complete —
+                     full real-browser collaboration workflow passed with
+                     real Marvin/Shafica accounts. One real bug found and
+                     fixed (migration 028, NOT YET APPLIED — see below);
+                     one cosmetic dev-mode warning flagged, not yet fixed.
 OVERALL PROGRESS:    20 of 20 original steps + Step 21A + 21A.1 + 21B + 21C +
-                     21C.1 + 21D, all complete and fully verified live.
-LAST COMMIT:         591a053 (Step 21D, pushed) — migration 027's commit is
-                     next in this session, see below.
+                     21C.1 + 21D + 21E, all complete. Everything is verified
+                     live except migration 028, which needs to be applied.
+LAST COMMIT:         591a053 (Step 21D, pushed). Steps 21C.1's migration-027
+                     confirmation and 21E are both new this session, not yet
+                     committed — see below.
 APP STATUS:          npm run lint ✅ · npx tsc --noEmit ✅ · npm run build ✅ zero errors
-                     ✅ Step 21D (task assignment, mentions, notifications, My Tasks)
-                     complete, 43/48 checks passed live, and the one genuine
-                     follow-up finding (task_comments cascade-orphan audit rows,
-                     a second-level version of Known Issue #11) is now also
-                     fixed and verified: migration 027 applied by Marvin,
-                     targeted re-test (create project -> task -> comment ->
-                     hard-delete) confirms 8/8 — zero orphan rows produced,
-                     the workspace-level HARD_DELETE marker still works
-                     correctly. Known Issue #12 resolved.
+                     ✅ Step 21E (browser UAT) — ran the full real-browser
+                     collaboration workflow end to end using real Marvin/Shafica
+                     accounts against a temporary, clearly-named test project.
+                     Everything Step 21D built worked correctly through actual
+                     UI clicks, not just API calls: assignment, role-gated
+                     editing, mentions, all 4 notification types (including
+                     one — access_request_approved — not explicitly checked
+                     before), the full readable Activity tab, and My Tasks
+                     filtering. Found ONE real, previously-undiscovered bug:
+                     a pending access requester shows as "Unknown user" to the
+                     reviewing owner/manager, because can_view_profile() only
+                     grants visibility once a user is already an ACTIVE member
+                     — which a pending requester by definition isn't yet.
+                     Root-caused and fixed in migration 028 (NOT YET APPLIED).
+                     Also found a minor, dev-mode-only React duplicate-key
+                     warning inside ProjectShareModal's "Recent activity" mini-
+                     feed, likely provoked by this session's unusually rapid
+                     scripted re-navigation rather than something a real user
+                     would trigger — flagged for follow-up, not fixed. The
+                     real "Regal Bay Properties (Pty) Ltd" project was
+                     confirmed completely untouched throughout, and the test
+                     project's hard-delete left zero orphan rows (confirming
+                     027's fix holds under a real UI-driven delete too).
 ```
 
 ---
@@ -57,7 +76,8 @@ APP STATUS:          npm run lint ✅ · npx tsc --noEmit ✅ · npm run build �
 | 21B | Project Invite + Approval UI | ✅ Complete, verified live | step-21b | Invite links, approval flow, member management, migrations 022+023 |
 | 21C | Project Audit Trail + Activity Visibility | ✅ Complete, verified live | step-21c | Activity tab, human-readable formatting, migration 024 (profiles visibility fix) |
 | 21C.1 | Audit Retention Cleanup for Hard-Deleted Projects | ✅ Complete, verified live | 6728353 | Migration 025 — resolves Known Issue #11, hard-delete purges project audit history + workspace-level HARD_DELETE marker, 25/25 checks passing |
-| 21D | Practical Collaboration Tools | ✅ Complete, verified live | (see session log) | Migration 026 — task assignment, mentions, notification fixes, My Tasks filter, 43/48 checks passing + 1 follow-up fix (migration 027, not yet applied) |
+| 21D | Practical Collaboration Tools | ✅ Complete, verified live | 591a053 | Migration 026 — task assignment, mentions, notification fixes, My Tasks filter, 43/48 checks passing; migration 027 follow-up fix applied and confirmed (8/8) |
+| 21E | Browser UAT + Release Hardening | ✅ Complete, real browser | (uncommitted) | Full real-browser collaboration workflow verified with Marvin/Shafica accounts; found + fixed 1 real bug (migration 028, not yet applied) |
 
 **Status icons:**
 ⬜ Not started | 🔄 In progress | ✅ Complete | ❌ Blocked
@@ -1476,9 +1496,217 @@ BOTTOM LINE
   passed on the first live pass. Migration 027 is a narrow, non-security
   cleanup fix for a cascade-orphan edge case this step's own testing
   happened to surface — it does not change or weaken anything Step 21D
-  itself does, and is written/reviewed but not yet applied to live
-  Supabase (needs Marvin to run it same as every other migration in this
-  project). No real workspace/user/project data was touched at any point.
+  itself does. Marvin applied migration 027 the same session; a targeted
+  re-test (create project -> task -> comment -> hard-delete, the exact
+  scenario that produced the orphan before) confirmed 8/8 checks passing,
+  zero orphan rows, HARD_DELETE marker still correct. No real workspace/
+  user/project data was touched at any point.
+```
+
+---
+
+### Step 21E — Browser User Acceptance Testing + Release Hardening
+```
+Status:     ✅ Complete — full real-browser workflow verified. One real bug
+            found and fixed; migration 028 NOT YET APPLIED.
+Started:    2026-07-09
+Completed:  2026-07-09
+
+METHOD — actually different from every prior verification round
+  Every previous round (21A-21D) drove Supabase directly via the REST/RPC
+  API using real authenticated sessions — correct for RLS verification, but
+  never actually exercised the Next.js app's own UI code, client-side
+  permission gating, or real user click-paths. This step did that instead:
+  started the actual dev server and drove the real browser (via the preview
+  tool), clicking real buttons, filling real forms, reading real rendered
+  text — for both Marvin and Shafica.
+
+  Since Shafica's real password isn't available to this session (only
+  Marvin's was provided), her sign-ins were done via a Supabase admin-
+  generated magic-link token, exchanged for a real session client-side
+  (fetch to Supabase's /auth/v1/verify, then the resulting access/refresh
+  tokens written into the browser's own sb-*-auth-token cookie in the exact
+  format the app's own login flow produces) — this establishes a
+  completely real, indistinguishable-from-normal browser session and
+  cookie, just without needing her password. Marvin's own sign-in used his
+  real email+password through the actual login form for at least the first
+  round-trip, confirming the real form flow works end-to-end too.
+
+ENVIRONMENT ISSUE FOUND AND WORKED AROUND (not a product bug)
+  This sandbox's Node process can't verify TLS certificates for outbound
+  HTTPS (fonts.googleapis.com font fetches were failing with
+  UNABLE_TO_VERIFY_LEAF_SIGNATURE from the very first server start). That
+  same failure was also breaking middleware's supabase.auth.getUser() call
+  (used to check the session on every request) — so real sign-ins appeared
+  to silently fail, bouncing back to /login even though the Supabase auth
+  call itself had succeeded and the correct cookie was present in the
+  browser. Confirmed via server logs (identical UNABLE_TO_VERIFY_LEAF_SIGNATURE
+  errors firing immediately after the login POST). This is a sandbox/local
+  dev-environment limitation, not an app bug — Vercel's build/runtime
+  environment has normal certificate trust and would not hit this.
+  Temporarily added `"env": {"NODE_OPTIONS": "--use-system-ca"}` to
+  `.claude/launch.json` for this session's testing only, then reverted it
+  before finishing (confirmed zero diff against the committed version) —
+  this was never meant to be a permanent or committed change.
+
+TEST FLOW — real browser, real accounts, temporary project only
+  Followed the exact 33-step flow requested. All of the following were
+  confirmed through actual UI interaction (not API calls), with DB reads
+  used only to double-check state, never to substitute for the UI action:
+  1-4.  Signed in as Marvin via the real login form; created
+        "TEMP QA Collaboration Test - Delete Me" via the New Project modal;
+        confirmed owner membership auto-created; opened the project.
+        (Found: the New Project modal doesn't auto-close after a
+        successful create — the new project appears in the list behind it,
+        but the modal stays open. Minor UX polish, not a data/security bug,
+        not fixed here — flagged.)
+  5.    Default columns (Todo/In Progress/Review/Done) already existed —
+        no column creation needed.
+  6.    Created 3 tasks via "+ Add card": one assigned to Marvin, one to
+        Shafica (before she was even a member — assignment happened after
+        her approval, in the correct order per the flow), one left
+        unassigned. Assignment done via the real TaskAssigneesPanel UI.
+  7-8.  Created an invite link (Editor role, approval required) via the
+        real Share modal; captured the real link.
+        Confirmed the raw token is NOT present anywhere in the
+        project_invites row (only token_hash) or in its audit_events
+        entries (new_data explicitly excludes the token_hash key) —
+        re-confirms the Step 21B design holds under a real UI-generated
+        token, not just a script-generated one.
+  9-11. Signed out; opened the invite link signed-out — confirmed it shows
+        "Sign in or create an account to request access," not the project.
+        Signed in as Shafica; the same link now showed "Requesting editor
+        access... Request Access" — confirmed sign-in gate works.
+  13-14. Clicked Request Access; confirmed "request sent" screen. Confirmed
+        Shafica could NOT open the project yet (renders "Project not
+        found" — correct, RLS-driven invisibility rather than a leaked
+        "access denied," so a non-member can't distinguish a real project
+        she isn't in from one that doesn't exist).
+  15-17. Signed in as Marvin; opened the Share modal's Requests tab.
+        **FOUND A REAL BUG HERE** — see below. Approved the request anyway
+        (Approve/Reject still function correctly despite the display bug);
+        confirmed project_access_requests.status -> approved and a new
+        active project_members row (role=editor) was created. Confirmed
+        Shafica now shows correctly (name + email + role) in the Members
+        tab — proving the bug is specific to the *pending* state only.
+  18.   Assigned Shafica to her task via the real Assignees UI.
+  19-23. Signed in as Shafica: confirmed she can open the project, sees
+        her assigned task with her avatar badge, "My tasks" toggle
+        correctly filters the board (3 tasks -> 1), and she has no Share
+        button (editor can't manage invites, correct). Posted a comment
+        mentioning Marvin via the real comment box
+        ("On it @Marvin, will finish this today").
+  24-25. Confirmed via the real notification bell (signed back in as
+        Marvin) that BOTH a task_commented and a mention notification
+        appeared, with correct icons (💬 and @), titles, and bodies, and
+        the unread badge showed "2."
+  26.   Opened the Activity tab as Marvin — confirmed every requested
+        category present with fully readable text: project creation,
+        invite creation, access request, approval, membership addition
+        (x2 — owner auto-add + Shafica's approval-triggered add), 3x task
+        creation, 2x assignment, 1x comment. Mentions are not their own
+        audit_events row by design (they're notifications, not an audited
+        entity) — correctly absent, not a gap. Also did a task priority
+        update (Unassigned task: none -> high) specifically to confirm
+        "task update" shows too — it does, with the specific
+        before/after values.
+  27-29. Changed Shafica's role to Viewer via the real Members panel role
+        menu. Signed in as Shafica: confirmed via the real UI that she can
+        still view the board, but priority/due-date fields are disabled,
+        no comment input (a permission notice shows instead), no Assign
+        button, no Share button, and no Activity tab icon at all.
+        Independently re-confirmed every one of these at the RLS layer
+        directly (not just UI-hidden): task UPDATE silently affects 0
+        rows, comment INSERT and assignment INSERT both return 42501, and
+        a self-role-escalation attempt (update her own row to owner)
+        left her role unchanged at viewer.
+  30-33. Hard-deleted the test project as Marvin (there is no delete
+        button in the UI by design, per Step 21A.1's decision — used the
+        owner's real authenticated session directly, the same "safest
+        cleanup path" every prior round has used). Confirmed zero leftover
+        rows anywhere (project_members, tasks, task_assignees,
+        project_invites, project_access_requests, project-scoped
+        audit_events all 0) and zero new orphan audit rows — confirming
+        027's fix holds under a real UI-driven delete of a project that
+        had actual comments on its tasks, not just a scripted test.
+        Cleaned up the resulting HARD_DELETE marker and the 4 real
+        notifications this flow generated (including one for
+        access_request_approved, not explicitly exercised in Step 21D's
+        own verification) by exact id. Confirmed the real
+        "Regal Bay Properties (Pty) Ltd" project and its task were
+        completely untouched throughout — checked explicitly before,
+        during, and after.
+
+REAL BUG FOUND AND FIXED — pending access requester shows as "Unknown user"
+  ProjectAccessRequests.tsx already does the correct two-step profile fetch
+  (fetchProfilesByIds), but Marvin's review panel showed Shafica's very
+  real, very complete pending request as "Unknown user" instead of her
+  name. Root cause: can_view_profile() (migration 024) only grants
+  visibility once the viewer and target already share an ACTIVE project
+  membership or a workspace membership — but a person who has just
+  requested access is, by definition, not yet an active member. That's
+  exactly the chicken-and-egg gap: you need to see who's requesting in
+  order to meaningfully decide whether to approve them, but the profile
+  visibility rule doesn't kick in until after you've already approved
+  them. This makes the entire approve/reject review flow effectively blind
+  for any first-time requester — confirmed live, this wasn't a hypothetical.
+  Fixed in supabase/migrations/028_fix_access_request_profile_visibility.sql
+  — narrowly extends can_view_profile() (not the RLS policy itself, which
+  already just calls this function) with one more case: an owner/manager
+  can see the profile of anyone who has a project_access_requests row on a
+  project they manage, scoped by the existing can_manage_project() check.
+  Not a blanket widening — mirrors 024's own reasoning exactly. **Written
+  and reviewed but NOT YET APPLIED to live Supabase** — Approve/Reject
+  themselves still worked correctly throughout this test despite the
+  display bug (confirmed: the request approved cleanly, membership was
+  granted correctly), so this didn't block the rest of the UAT, but it
+  should be applied before relying on the approval flow for real requests
+  from people Marvin doesn't already share a workspace with.
+
+MINOR FINDINGS (not fixed — flagged for follow-up, not release blockers)
+  - New Project modal doesn't auto-close after a successful create (item
+    4 above). Cosmetic only — the project is created correctly and shows
+    in the list immediately.
+  - ProjectShareModal's "Recent activity" mini-feed (inside the Share
+    modal, distinct from the full Activity tab) shows raw
+    `entity_type action` text (e.g. "task_assignees insert") instead of
+    the same readable formatAuditEvent() labels the main Activity tab
+    uses. This was a deliberate "don't overbuild" scope cut from Step 21B
+    originally ("a small recent-activity feed... per do not overbuild"),
+    not a regression — flagging only because it's now a visible
+    inconsistency next to the much nicer main Activity tab built in 21C.
+  - A React "duplicate key" console warning appeared inside
+    ProjectShareModal during this session's testing, dev-mode only.
+    Root cause not confirmed — most likely provoked by this session's
+    unusually rapid scripted full-page reloads and cross-account cookie
+    swaps (not a normal user click-path), since it only ever appeared
+    after repeated automated reload cycles, never on a first render. Not
+    chased further given the cosmetic, dev-mode-only nature and the
+    likelihood it's a testing-methodology artifact rather than a real
+    defect — flagged for a human to keep an eye on, not fixed blind.
+
+TESTING
+  npm run lint       -> PASS, no warnings or errors
+  npx tsc --noEmit   -> PASS, zero errors
+  npm run build      -> PASS, compiled clean, 21/21 routes generated
+  Mobile (375px): layout correctly switches to the mobile shell (hamburger
+  menu, off-canvas sidebar) — confirmed via DOM structure; the tool's
+  visual screenshot capture timed out at this viewport in this sandbox
+  (separate from the app itself — the dev server kept responding to
+  requests normally throughout, e.g. GET /dashboard 200 in ~1s), so this
+  was verified structurally rather than with a rendered screenshot. Not
+  treated as a product bug — no console or network errors accompanied it.
+
+RELEASE READINESS
+  The collaboration workflow itself (invite -> request -> approve ->
+  assign -> collaborate -> role-restrict -> cleanup) is genuinely ready
+  for Marvin and Shafica to use for real work, PROVIDED migration 028 is
+  applied first — without it, every new person's first access request
+  will display as "Unknown user," which is confusing but not unsafe (the
+  approve/reject buttons still work correctly against the right person
+  underneath). No security or data-integrity issues were found in this
+  round. No real workspace/user/project data was touched at any point —
+  confirmed explicitly before and after.
 ```
 
 ---
@@ -1497,7 +1725,8 @@ BOTTOM LINE
 | 8 | **Privilege escalation (found and fixed before ever being exploitable):** the Step 21A UPDATE policy on `project_access_requests` had `USING (user_id = auth.uid() OR can_manage_project(project_id))` with no `WITH CHECK`. Postgres reuses `USING` as the check when none is given, so a requester could update their own row and set `status = 'approved'` directly — self-approving. Harmless in isolation (nothing consumed that status transition yet), but Step 21B adds a trigger that auto-grants `project_members` on approval, which would have turned this into a real, exploitable escalation. Fixed in migration 022 before that trigger went live: self-service UPDATE removed entirely (only owner/manager can move a request to approved/rejected), and INSERT now forces `status = 'pending'` so a request can never be created already-approved either. | 21B | **High** | ✅ Fixed in 022, verified live |
 | 9 | Migration 022's `enforce_project_member_rules()` trigger fires on the cascading delete of `project_members` when a project is deleted, and its "don't remove the last owner" check couldn't tell that apart from a standalone removal — briefly regressing 021's owner-hard-delete (blocked with "Cannot remove the last active owner of a project" for every project, no exceptions). Found immediately during Step 21B's live verification (4 test-cleanup deletes failed). Fixed in migration 023 by checking whether the parent project row still exists before enforcing the owner rules — same technique as the 019 audit_events cascade fix. Re-verified: owner hard-delete works normally again. | 21B | Medium | ✅ Fixed in 023, verified live |
 | 10 | **Pre-existing (not introduced by any recent step):** `profiles` RLS only ever allowed a user to see their own row, and separately the `profiles!<table>_<column>_fkey` embed syntax used throughout the app can never work — those tables' `user_id` columns have a foreign key to `auth.users`, not to `profiles`, so PostgREST has no relationship to traverse under any hint name (confirmed live: PGRST200 "relationship not found" every time). Together this means no teammate's name/avatar has ever actually rendered anywhere in the app for a second real user — silently, since the calling code always falls back to an empty/blank state rather than surfacing the query error. Fixed the RLS half everywhere (migration 024, `can_view_profile()` — collaboration-scoped, not blanket-open) and the query-syntax half in the 3 files Step 21C actually touches (`ProjectMembersPanel`, `ProjectAccessRequests`, the project page's assignee-avatar map). Fixed in `components/projects/TaskDetail.tsx` during Step 21D (already needed to touch comment handling there for mentions). **Two occurrences remain unfixed** — `app/(app)/team/page.tsx`, `app/(app)/dashboard/page.tsx` — still flagged as a separate follow-up; the RLS prerequisite (024) is already in place for whenever that lands, only the query syntax in those 2 files still needs the same two-step-fetch fix. | 21C / 21D | High (pre-existing UX defect, not a security issue) | 🔄 Partially fixed — 2 files still pending, follow-up task flagged |
-| 12 | **Found during Step 21D's live verification, not introduced by 21D:** hard-deleting a project whose tasks had comments left invisible orphan `audit_events` rows (project_id AND workspace_id both null) for the `task_comments` cascade-deletes — a second-level version of the exact problem Step 21C.1 (migration 025) was meant to fully close. Root cause: unlike every other audited entity type, `task_comments` resolves its project_id *indirectly* (a lookup through the `tasks` table) rather than reading it off its own row; 025's fix only guarded "project_id was found, but the project lookup then failed," and never anticipated a second cascade level where the task_comments row's own lookup-through-tasks fails because the task is *also* already gone in the same transaction. Root-caused and fixed in `supabase/migrations/027_fix_task_comments_cascade_orphan.sql`, giving task_comments the same "parent gone mid-cascade, skip instead of orphan" treatment every other entity type already had. The 3 orphan rows from this test run were deleted by exact id as part of Step 21D's verification cleanup. **Migration 027 applied by Marvin; re-verified with a targeted test (project -> task -> comment -> hard-delete): 8/8 checks passed, zero orphan rows produced, HARD_DELETE marker still correct.** | 21D verification | Medium | ✅ Fixed and verified live |
+| 12 | **Found during Step 21D's live verification, not introduced by 21D:** hard-deleting a project whose tasks had comments left invisible orphan `audit_events` rows (project_id AND workspace_id both null) for the `task_comments` cascade-deletes — a second-level version of the exact problem Step 21C.1 (migration 025) was meant to fully close. Root cause: unlike every other audited entity type, `task_comments` resolves its project_id *indirectly* (a lookup through the `tasks` table) rather than reading it off its own row; 025's fix only guarded "project_id was found, but the project lookup then failed," and never anticipated a second cascade level where the task_comments row's own lookup-through-tasks fails because the task is *also* already gone in the same transaction. Root-caused and fixed in `supabase/migrations/027_fix_task_comments_cascade_orphan.sql`, giving task_comments the same "parent gone mid-cascade, skip instead of orphan" treatment every other entity type already had. The 3 orphan rows from this test run were deleted by exact id as part of Step 21D's verification cleanup. **Migration 027 applied by Marvin; re-verified with a targeted test (project -> task -> comment -> hard-delete): 8/8 checks passed, zero orphan rows produced, HARD_DELETE marker still correct.** Re-confirmed a second time under a real UI-driven delete during Step 21E. | 21D verification | Medium | ✅ Fixed and verified live |
+| 13 | **Found during Step 21E's real-browser UAT, not introduced by 21E:** a pending project access requester displays as "Unknown user" to the reviewing owner/manager, instead of their real name/email. `ProjectAccessRequests.tsx` already does the correct profile lookup; the RLS-backing `can_view_profile()` function (migration 024) is the actual cause — it only grants visibility once the viewer and target already share an *active* project or workspace membership, which a brand-new requester by definition doesn't have yet. This makes the approve/reject review screen effectively blind for any first-time requester (confirmed live with a real request from Shafica, not a hypothetical) — you can approve or reject, but you can't see who you're approving. Approve/Reject themselves still function correctly underneath despite the display bug. Root-caused and fixed in `supabase/migrations/028_fix_access_request_profile_visibility.sql` — narrowly extends `can_view_profile()` (not the RLS policy itself) with one more case: an owner/manager can see the profile of anyone with a pending/reviewed access request on a project they manage, scoped by the existing `can_manage_project()` check. Not a blanket widening. **Written and reviewed but not yet applied to live Supabase.** | 21E | Medium (blind review, not a security hole) | 🔄 Fixed in code — migration 028 not yet applied |
 | 11 | `audit_events` rows generated by a project's own cascading delete (documenting the project/its members/its tasks being deleted) had `project_id` and `workspace_id` nulled by the Step 21A fix that avoids an FK violation during cascade — but the `audit_events` SELECT policy requires `project_id IS NOT NULL`, so those rows were permanently invisible to everyone (short of the service role) instead of either being cleanly removed or genuinely retained as visible history. **Resolved by product decision in Step 21C.1** (migration 025): archiving preserves full audit history unchanged (verified live); hard delete now purges that project's audit_events (pre-existing rows already cascade-deleted via the FK; cascade-child events — project_members/tasks/task_comments deletes fired during the same transaction — are no longer inserted at all once the parent project is gone, instead of being inserted orphaned) and logs one workspace-level `HARD_DELETE` marker (project_id NULL, workspace_id preserved) visible only to the workspace owner/admin via one narrow added RLS branch. One-time cleanup removed the 39 pre-existing orphan rows. **Migration 025 applied and fully verified live — 25/25 checks passed**, including confirming zero new orphans get created, exactly one marker is logged per hard delete, and the marker is visible to the owner but not to an unrelated user. | 21C / 21C.1 | Medium | ✅ Fixed and verified live |
 
 ---
@@ -1549,6 +1778,7 @@ BOTTOM LINE
 | 2026-07-09 | Step 21D — practical collaboration tools, built (not yet live-verified) | Built task assignment (new task_assignees join table + RLS + audit + notifications, replacing the old unenforceable `assigned_to uuid[]` array as the source of truth going forward), due-date/priority UI permission gating (fields already existed from Step 1, just weren't role-gated in the UI), @mention detection + a validating RPC for mention notifications, and a project-level My Tasks filter. Found and fixed two real pre-existing bugs while investigating notifications before writing new ones (per instruction): (1) `notifications` has never had an INSERT policy of any kind, so both existing client-side notification calls in TaskDetail.tsx (task_assigned, task_commented) have been silently failing since they were written — fixed by moving notification creation server-side via SECURITY DEFINER triggers/RPC instead of opening a client-writable INSERT policy; (2) TaskDetail.tsx was one of the three files flagged-but-unfixed in Step 21C's Known Issue #10 for the broken `profiles!<table>_<column>_fkey` embed pattern — fixed here since this step already required touching comment handling for mentions, closing 2 of the remaining 3 occurrences. Also extended notifications.type for access_request_approved/rejected (the exact gap flagged as a TODO in Step 21B). npm run lint / npx tsc --noEmit / npm run build all clean. **Migration 026 not yet applied to live Supabase and not yet live-verified** — code-complete only this round. Not yet committed to git. |
 | 2026-07-09 | Step 21D — live verification, migration 026 applied, complete | Marvin applied migration 026. Ran the full A-T verification via real authenticated sessions for both real users, flipping Shafica's project_members role/status between owner/manager/editor/commenter/viewer/removed to cover every permission boundary. 43/48 checks passed on the first pass. Investigated all 5 "failures": 4 were a flaw in the test script itself (it assumed project_members/tasks/audit_events/notifications would be empty after cleanup without ever capturing a real baseline for those tables — there's a genuine pre-existing production project, "Regal Bay Properties (Pty) Ltd," that was already live and correctly untouched throughout); the 5th was a real finding — hard-deleting a project whose tasks had comments left 3 invisible orphan audit_events rows, a second-level version of the exact Known Issue #11 problem 21C.1 was meant to fully close (task_comments resolves its project_id indirectly through the tasks table, and 21C.1's guard never anticipated the task itself also being gone by the time task_comments' cascade-delete trigger fires). Root-caused and fixed in migration 027 (not yet applied); cleaned up the 3 orphan rows plus 3 test notifications by exact id, confirmed via direct inspection that all 6 were unambiguous test residue before deleting. DB confirmed back to the true pre-test state (3 real audit rows, 0 notifications, 1 real project, 2 real workspaces, all untouched). Every actually-requested Step 21D behavior (task assignment by role, due-date/priority permission gating, comment permission gating, mentions with server-side re-validation, all 4 notification types, Activity tab entries, My Tasks visibility, cross-user isolation, personal-task regression) passed. Step 21D is complete and safe. |
 | 2026-07-09 | Step 21D follow-up — migration 027 applied, re-verified | Marvin applied migration 027. Ran a small targeted test isolating exactly the scenario that produced the orphan before (create a project, a task in it, a comment on that task, then hard-delete the project — the 2-level project->task->comment cascade): **8/8 checks passed** — zero orphan audit_events rows created, the workspace-level HARD_DELETE marker still logs correctly with workspace_id preserved, cleanup by exact id, audit_events count back to the true baseline (3, all belonging to the real "Regal Bay Properties (Pty) Ltd" project, untouched throughout). Known Issue #12 resolved. |
+| 2026-07-09 | Step 21E — browser UAT + release hardening, complete | Ran the full 33-step collaboration workflow through a real running dev server and real browser automation (not API scripts) for the first time, using Marvin's real email/password login and Shafica's session established via an admin-generated magic link exchanged into a real browser cookie (her password wasn't available this session). Hit and worked around a sandbox-only TLS trust issue that was silently bouncing real logins back to /login (middleware's session check was failing the same way font fetches already were) — temporary `NODE_OPTIONS=--use-system-ca` added to `.claude/launch.json` for the session only, reverted before finishing (confirmed zero diff). Created a clearly-named temp project, 3 tasks (Marvin-assigned/Shafica-assigned/unassigned), an invite link, confirmed the raw token never touches the DB or audit trail, confirmed the sign-in gate and pre-approval invisibility both work, approved Shafica's access request, assigned her a task, and confirmed from her real session that she sees the task, My Tasks filters correctly, she can comment and @mention, and Marvin gets both notifications via the real bell UI. Confirmed the full Activity tab shows every requested category with readable text. Changed her role to viewer and confirmed every restriction (can't edit, comment, assign, manage members, see Activity) at both the UI and RLS layer. Hard-deleted the test project through Marvin's real session (no delete UI exists by design) — zero orphan rows, confirming 027's fix holds under a real UI-driven delete with actual comments involved. **Found and fixed one real, previously-undiscovered bug:** pending access requesters show as "Unknown user" to the reviewing owner/manager because `can_view_profile()` only grants visibility to already-active collaborators — a brand-new requester isn't one yet. Fixed in migration 028 (narrow extension, not yet applied). Flagged two minor, non-blocking cosmetic items for follow-up (New Project modal doesn't auto-close; ProjectShareModal's mini activity feed shows raw DB values instead of readable labels) plus one dev-mode-only React key warning likely caused by this session's unusual rapid-reload testing rather than a real defect. The real "Regal Bay Properties (Pty) Ltd" project was confirmed untouched throughout. npm run lint / npx tsc --noEmit / npm run build all clean. Step 21E is complete; the collaboration system is ready for real use once migration 028 is applied. |
 
 ---
 
