@@ -150,8 +150,8 @@ step-11: realtime task sync across two browser windows — tested ✓
 ```
 
 ### Branch strategy
-- **GitHub account:** shaficajansen96-beep
-- **Repo:** https://github.com/shaficajansen96-beep/MyReality
+- **GitHub account:** marvinjansen681-png
+- **Repo:** https://github.com/marvinjansen681-png/MyReality
 - Work on `main` branch only for this project
 - No feature branches unless Marvin asks for them
 - Never force push

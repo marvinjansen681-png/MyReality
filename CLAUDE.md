@@ -27,8 +27,8 @@ When Marvin says **"get to work"** or **"continue"** or **"let's go"** — that 
 **Stack:** Next.js 14 · TypeScript · Supabase · Tailwind · Vercel
 **Platforms:** Web · PWA (installable) · Android (Capacitor → Play Store)
 
-**GitHub account:** shaficajansen96-beep
-**GitHub repo:** https://github.com/shaficajansen96-beep/MyReality
+**GitHub account:** marvinjansen681-png
+**GitHub repo:** https://github.com/marvinjansen681-png/MyReality
 **Supabase project URL:** https://khcpvjtphzidwzbhtayh.supabase.co
 **Supabase REST endpoint:** https://khcpvjtphzidwzbhtayh.supabase.co/rest/v1/
 

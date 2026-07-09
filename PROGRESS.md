@@ -1254,7 +1254,7 @@ BOTTOM LINE
 | Resend API Key | ⬜ | Not set — RESEND_ENABLED=false until added |
 | Google OAuth Client ID | ⬜ | Configure in Supabase Auth dashboard |
 | Vercel deployment URL | ⬜ | Set after first deploy |
-| GitHub repo connected | ✅ | https://github.com/shaficajansen96-beep/MyReality |
+| GitHub repo connected | ✅ | https://github.com/marvinjansen681-png/MyReality |
 
 ---
 
@@ -1264,7 +1264,7 @@ BOTTOM LINE
 |---|---|---|---|
 | Local | http://localhost:3001 | ✅ Running | 2026-06-08 |
 | Supabase | https://khcpvjtphzidwzbhtayh.supabase.co | ✅ Project active | — |
-| GitHub | https://github.com/shaficajansen96-beep/MyReality | ✅ Repo ready | — |
+| GitHub | https://github.com/marvinjansen681-png/MyReality | ✅ Repo ready | — |
 | Vercel (production) | — | Not deployed yet | — |
 | Android APK | — | Not built yet | — |
 
