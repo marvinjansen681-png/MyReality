@@ -9,10 +9,11 @@ import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortab
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useRealtime } from '@/lib/hooks/useRealtime'
+import { canEditProjectContent } from '@/lib/permissions/projectPermissions'
 import BoardColumn from './BoardColumn'
 import TaskCard from './TaskCard'
 import TaskDetail from './TaskDetail'
-import type { Column, Task, Profile } from '@/types'
+import type { Column, Task, Profile, ProjectRole } from '@/types'
 
 interface BoardViewProps {
   columns: Column[]
@@ -21,12 +22,14 @@ interface BoardViewProps {
   userProfile: Profile | null
   projectId: string
   profileMap?: Record<string, Profile>
+  projectRole?: ProjectRole | null
 }
 
-export default function BoardView({ columns, initialTasks, userId, userProfile, projectId, profileMap }: BoardViewProps) {
+export default function BoardView({ columns, initialTasks, userId, userProfile, projectId, profileMap, projectRole = null }: BoardViewProps) {
   const [tasks, setTasks] = useState(initialTasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [dragging, setDragging] = useState<Task | null>(null)
+  const canEdit = canEditProjectContent(projectRole)
 
   useRealtime({
     projectId,
@@ -58,7 +61,7 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     setDragging(null)
-    if (!over) return
+    if (!over || !canEdit) return
 
     const draggedTask = tasks.find(t => t.id === active.id)
     if (!draggedTask) return
@@ -104,6 +107,7 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
   }
 
   async function addTask(columnId: string, title: string) {
+    if (!canEdit) return
     const supabase = createClient()
     const colTasks = getColumnTasks(columnId)
     const { data, error } = await supabase
@@ -125,6 +129,7 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
   }
 
   async function moveTask(task: Task, columnId: string) {
+    if (!canEdit) return
     const targetTasks = getColumnTasks(columnId)
     setTasks(prev => prev.map(t =>
       t.id === task.id
@@ -162,6 +167,7 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
               onAddTask={addTask}
               onMoveTask={moveTask}
               profileMap={profileMap}
+              canEdit={canEdit}
             />
           ))}
         </div>
@@ -175,6 +181,7 @@ export default function BoardView({ columns, initialTasks, userId, userProfile, 
           onAddTask={addTask}
           onMoveTask={moveTask}
           profileMap={profileMap}
+          canEdit={canEdit}
         />
 
         <DragOverlay>
@@ -207,7 +214,7 @@ function columnStatusMap(columnId: string, columns: Column[]): Task['status'] {
   return 'todo'
 }
 
-function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onMoveTask, profileMap }: {
+function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onMoveTask, profileMap, canEdit }: {
   columns: Column[]
   tasks: Task[]
   colMeta: { id: string; title: string }[]
@@ -215,6 +222,7 @@ function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onM
   onAddTask: (colId: string, title: string) => void
   onMoveTask: (t: Task, colId: string) => void
   profileMap?: Record<string, Profile>
+  canEdit: boolean
 }) {
   const [activeColIdx, setActiveColIdx] = useState(0)
   const activeCol = columns[activeColIdx]
@@ -255,7 +263,7 @@ function MobileColumnTabs({ columns, tasks, colMeta, onTaskClick, onAddTask, onM
             index={i}
           />
         ))}
-        <MobileAddCard columnId={activeCol.id} onAdd={onAddTask} />
+        {canEdit && <MobileAddCard columnId={activeCol.id} onAdd={onAddTask} />}
       </div>
     </div>
   )

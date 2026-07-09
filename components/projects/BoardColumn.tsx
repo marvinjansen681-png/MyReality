@@ -16,9 +16,10 @@ interface BoardColumnProps {
   onAddTask: (columnId: string, title: string) => void
   onMoveTask: (task: Task, columnId: string) => void
   profileMap?: Record<string, Profile>
+  canEdit?: boolean
 }
 
-export default function BoardColumn({ column, tasks, allColumns, onTaskClick, onAddTask, onMoveTask, profileMap }: BoardColumnProps) {
+export default function BoardColumn({ column, tasks, allColumns, onTaskClick, onAddTask, onMoveTask, profileMap, canEdit = true }: BoardColumnProps) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -51,14 +52,16 @@ export default function BoardColumn({ column, tasks, allColumns, onTaskClick, on
           <span className="text-sm font-semibold text-primary">{column.title}</span>
           <span className="text-xs text-muted bg-hover px-1.5 py-0.5 rounded-full">{tasks.length}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setAdding(true)}
-            className="w-7 h-7 flex items-center justify-center text-muted hover:text-primary hover:bg-hover rounded-md transition-colors"
-          >
-            <Plus size={14} />
-          </button>
-        </div>
+        {canEdit && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setAdding(true)}
+              className="w-7 h-7 flex items-center justify-center text-muted hover:text-primary hover:bg-hover rounded-md transition-colors"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Cards */}
@@ -79,6 +82,7 @@ export default function BoardColumn({ column, tasks, allColumns, onTaskClick, on
       </div>
 
       {/* Add card footer */}
+      {canEdit && (
       <div className="px-2 pb-2 flex-shrink-0">
         {adding ? (
           <div className="space-y-2 pt-1">
@@ -108,6 +112,7 @@ export default function BoardColumn({ column, tasks, allColumns, onTaskClick, on
           </button>
         )}
       </div>
+      )}
     </div>
   )
 }

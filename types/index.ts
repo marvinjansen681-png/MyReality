@@ -7,6 +7,10 @@ export type VisionCategory = 'Faith' | 'Business' | 'Finance' | 'Family' | 'Heal
 export type VisionStatus = 'active' | 'achieved' | 'paused'
 export type NotificationType = 'task_assigned' | 'task_commented' | 'task_due' | 'mention' | 'vision_due'
 export type ActivityAction = 'created' | 'updated' | 'commented' | 'assigned' | 'moved' | 'completed' | 'reopened'
+export type ProjectRole = 'owner' | 'manager' | 'editor' | 'commenter' | 'viewer'
+export type ProjectMemberStatus = 'active' | 'removed' | 'pending'
+export type ProjectInviteRole = 'manager' | 'editor' | 'commenter' | 'viewer'
+export type ProjectAccessRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 
 export interface Profile {
   id: string
@@ -46,11 +50,69 @@ export interface Project {
   icon: string
   status: ProjectStatus
   created_by: string
+  archived_at: string | null
+  archived_by: string | null
+  archive_reason: string | null
   created_at: string
   updated_at: string
   columns?: Column[]
   member_count?: number
   task_count?: number
+}
+
+export interface ProjectMember {
+  id: string
+  project_id: string
+  user_id: string
+  role: ProjectRole
+  status: ProjectMemberStatus
+  added_by: string | null
+  added_at: string
+  removed_by: string | null
+  removed_at: string | null
+  profile?: Profile
+}
+
+export interface ProjectInvite {
+  id: string
+  project_id: string
+  created_by: string
+  token_hash: string
+  default_role: ProjectInviteRole
+  approval_required: boolean
+  max_uses: number | null
+  used_count: number
+  expires_at: string | null
+  revoked_at: string | null
+  created_at: string
+}
+
+export interface ProjectAccessRequest {
+  id: string
+  project_id: string
+  invite_id: string | null
+  user_id: string
+  requested_role: ProjectInviteRole
+  status: ProjectAccessRequestStatus
+  requested_at: string
+  reviewed_by: string | null
+  reviewed_at: string | null
+  review_note: string | null
+  profile?: Profile
+}
+
+export interface AuditEvent {
+  id: string
+  workspace_id: string | null
+  project_id: string | null
+  actor_id: string | null
+  entity_type: string
+  entity_id: string | null
+  action: string
+  old_data: Record<string, unknown> | null
+  new_data: Record<string, unknown> | null
+  metadata: Record<string, unknown>
+  created_at: string
 }
 
 export interface Column {
@@ -80,6 +142,11 @@ export interface Task {
   actual_hours: number | null
   parent_task_id: string | null
   is_personal: boolean
+  deleted_at: string | null
+  deleted_by: string | null
+  delete_reason: string | null
+  version: number
+  updated_by: string | null
   created_at: string
   updated_at: string
   subtasks?: Task[]

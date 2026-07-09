@@ -8,23 +8,27 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils/cn'
 import EmptyState from '@/components/shared/EmptyState'
 import PriorityBadge from '@/components/shared/PriorityBadge'
+import { canEditProjectContent } from '@/lib/permissions/projectPermissions'
 import TaskDetail from './TaskDetail'
-import type { Task, Column, Profile } from '@/types'
+import type { Task, Column, Profile, ProjectRole } from '@/types'
 
 interface ListViewProps {
   initialTasks: Task[]
   columns: Column[]
   userId: string
   userProfile: Profile | null
+  projectRole?: ProjectRole | null
 }
 
-export default function ListView({ initialTasks, columns, userId, userProfile }: ListViewProps) {
+export default function ListView({ initialTasks, columns, userId, userProfile, projectRole = null }: ListViewProps) {
   const [tasks, setTasks] = useState(initialTasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const canEdit = canEditProjectContent(projectRole)
 
   const colMap = Object.fromEntries(columns.map(c => [c.id, c.title]))
 
   async function toggleDone(task: Task) {
+    if (!canEdit) return
     const newStatus = task.status === 'done' ? 'todo' : 'done'
     const supabase = createClient()
     const { error } = await supabase.from('tasks').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', task.id)
@@ -62,7 +66,8 @@ export default function ListView({ initialTasks, columns, userId, userProfile }:
                 <td className="py-2.5 px-3" onClick={e => e.stopPropagation()}>
                   <button
                     onClick={() => toggleDone(task)}
-                    className="w-5 h-5 rounded-full border flex items-center justify-center transition-colors"
+                    disabled={!canEdit}
+                    className="w-5 h-5 rounded-full border flex items-center justify-center transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                     style={{ borderColor: task.status === 'done' ? 'var(--green)' : 'var(--border)', background: task.status === 'done' ? 'var(--green)' : 'transparent' }}
                   >
                     {task.status === 'done' && <span className="text-black text-[10px]">✓</span>}
@@ -109,7 +114,8 @@ export default function ListView({ initialTasks, columns, userId, userProfile }:
             <div className="flex items-start gap-3">
               <button
                 onClick={e => { e.stopPropagation(); toggleDone(task) }}
-                className="flex-shrink-0 mt-0.5 min-w-[44px] min-h-[44px] flex items-center justify-center -ml-3"
+                disabled={!canEdit}
+                className="flex-shrink-0 mt-0.5 min-w-[44px] min-h-[44px] flex items-center justify-center -ml-3 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {task.status === 'done'
                   ? <CheckCircle2 size={18} className="text-green" />

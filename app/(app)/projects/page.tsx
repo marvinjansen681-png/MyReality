@@ -55,6 +55,7 @@ export default function ProjectsPage() {
         .from('projects')
         .select('*, task_count:tasks(count)')
         .eq('workspace_id', workspaceId)
+        .neq('status', 'archived')
         .order('created_at', { ascending: false })
 
       setProjects((data ?? []).map((p: Record<string, unknown>) => ({
@@ -70,30 +71,54 @@ export default function ProjectsPage() {
     if (!workspace || !userId) return
     setCreating(true)
     const supabase = createClient()
-    const { data: created, error } = await supabase
+
+    // Insert without requesting the row back (no .select()): PostgREST's
+    // RETURNING evaluates the SELECT policy on the new row in the same
+    // statement as the owner-membership AFTER INSERT trigger, and that races
+    // — it can reject the insert outright with an RLS error even though the
+    // insert itself is fully authorized. Pre-generating the id and fetching
+    // it back in a separate follow-up query avoids the race entirely.
+    const projectId = crypto.randomUUID()
+    const { error } = await supabase.from('projects').insert({
+      id: projectId,
+      workspace_id: workspace.id,
+      name: data.name,
+      description: data.description || null,
+      color: selectedColor,
+      icon: selectedIcon,
+      created_by: userId,
+      status: 'active',
+    })
+    if (error) { setCreating(false); toast.error('Failed to create project'); return }
+
+    const { data: created, error: fetchError } = await supabase
       .from('projects')
-      .insert({
-        workspace_id: workspace.id,
-        name: data.name,
-        description: data.description || null,
-        color: selectedColor,
-        icon: selectedIcon,
-        created_by: userId,
-        status: 'active',
-      })
-      .select()
+      .select('*')
+      .eq('id', projectId)
       .single()
     setCreating(false)
-    if (error) { toast.error('Failed to create project'); return }
+    if (fetchError || !created) { toast.error('Project created, but could not load it. Please refresh.'); return }
 
     // Create default columns
     const sb = createClient()
     await sb.from('columns').insert([
-      { project_id: (created as Project).id, title: 'Todo', color: '#5a5248', position: 0 },
-      { project_id: (created as Project).id, title: 'In Progress', color: '#5b8fe0', position: 1 },
-      { project_id: (created as Project).id, title: 'Review', color: '#c9a84c', position: 2 },
-      { project_id: (created as Project).id, title: 'Done', color: '#4caf7d', position: 3 },
+      { project_id: projectId, title: 'Todo', color: '#5a5248', position: 0 },
+      { project_id: projectId, title: 'In Progress', color: '#5b8fe0', position: 1 },
+      { project_id: projectId, title: 'Review', color: '#c9a84c', position: 2 },
+      { project_id: projectId, title: 'Done', color: '#4caf7d', position: 3 },
     ])
+
+    // The owner-membership trigger should have already run — verify rather than assume.
+    const { data: ownerMembership } = await sb
+      .from('project_members')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle()
+    if (!ownerMembership) {
+      toast.error('Project created, but owner access could not be confirmed. Please refresh.')
+    }
 
     setProjects(prev => [{ ...(created as Project), task_count: 0 }, ...prev])
     reset()

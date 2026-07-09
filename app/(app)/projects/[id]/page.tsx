@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import BoardView from '@/components/projects/BoardView'
 import ListView from '@/components/projects/ListView'
-import type { Project, Column, Task, Profile } from '@/types'
+import type { Project, Column, Task, Profile, ProjectRole } from '@/types'
 
 export default function ProjectPage({ params }: { params: { id: string } }) {
   const [project, setProject] = useState<Project | null>(null)
@@ -16,6 +16,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const [userId, setUserId] = useState<string | null>(null)
   const [userProfile, setUserProfile] = useState<Profile | null>(null)
   const [profileMap, setProfileMap] = useState<Record<string, Profile>>({})
+  const [projectRole, setProjectRole] = useState<ProjectRole | null>(null)
   const [view, setView] = useState<'board' | 'list'>('board')
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -28,14 +29,16 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       if (!user) return
       setUserId(user.id)
 
-      const [profileRes, memberRes, projectRes, columnsRes, tasksRes] = await Promise.all([
+      const [profileRes, memberRes, projectRes, columnsRes, tasksRes, roleRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('workspace_members').select('workspace_id').eq('user_id', user.id).single(),
         supabase.from('projects').select('*').eq('id', params.id).single(),
         supabase.from('columns').select('*').eq('project_id', params.id).order('position'),
         supabase.from('tasks').select('*').eq('project_id', params.id).eq('is_personal', false).is('parent_task_id', null).order('position'),
+        supabase.from('project_members').select('role').eq('project_id', params.id).eq('user_id', user.id).eq('status', 'active').maybeSingle(),
       ])
 
+      if (roleRes.data) setProjectRole(roleRes.data.role as ProjectRole)
       if (profileRes.data) setUserProfile(profileRes.data as Profile)
       if (memberRes.data) {
         // Fetch all workspace member profiles for assignee avatars
@@ -121,6 +124,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           userProfile={userProfile}
           projectId={params.id}
           profileMap={profileMap}
+          projectRole={projectRole}
         />
       ) : (
         <ListView
@@ -128,6 +132,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           columns={columns}
           userId={userId ?? ''}
           userProfile={userProfile}
+          projectRole={projectRole}
         />
       )}
     </main>
