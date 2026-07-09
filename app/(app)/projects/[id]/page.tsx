@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, LayoutGrid, List, ArrowLeft, Share2 } from 'lucide-react'
+import { Loader2, LayoutGrid, List, ArrowLeft, Share2, History } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
-import { canManageInvites } from '@/lib/permissions/projectPermissions'
+import { canManageInvites, canViewAuditTrail } from '@/lib/permissions/projectPermissions'
+import { fetchProfilesByIds } from '@/lib/utils/profiles'
 import BoardView from '@/components/projects/BoardView'
 import ListView from '@/components/projects/ListView'
 import ProjectShareModal from '@/components/projects/ProjectShareModal'
+import ProjectAuditTrail from '@/components/projects/ProjectAuditTrail'
 import type { Project, Column, Task, Profile, ProjectRole } from '@/types'
 
 export default function ProjectPage({ params }: { params: { id: string } }) {
@@ -19,7 +21,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const [userProfile, setUserProfile] = useState<Profile | null>(null)
   const [profileMap, setProfileMap] = useState<Record<string, Profile>>({})
   const [projectRole, setProjectRole] = useState<ProjectRole | null>(null)
-  const [view, setView] = useState<'board' | 'list'>('board')
+  const [view, setView] = useState<'board' | 'list' | 'activity'>('board')
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
@@ -47,14 +49,10 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
         // Fetch all workspace member profiles for assignee avatars
         const { data: members } = await supabase
           .from('workspace_members')
-          .select('user_id, profile:profiles!workspace_members_user_id_fkey(id, full_name, avatar_url, email, created_at, updated_at)')
+          .select('user_id')
           .eq('workspace_id', memberRes.data.workspace_id)
         if (members) {
-          const map: Record<string, Profile> = {}
-          ;(members as unknown as { user_id: string; profile: Profile | Profile[] | null }[]).forEach(m => {
-            const p = Array.isArray(m.profile) ? m.profile[0] : m.profile
-            if (p) map[m.user_id] = p
-          })
+          const map = await fetchProfilesByIds(supabase, members.map(m => m.user_id))
           setProfileMap(map)
         }
       }
@@ -125,11 +123,19 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           >
             <List size={15} />
           </button>
+          {canViewAuditTrail(projectRole) && (
+            <button
+              onClick={() => setView('activity')}
+              className={cn('w-8 h-8 flex items-center justify-center rounded-md transition-colors', view === 'activity' ? 'bg-card text-primary shadow-sm' : 'text-muted hover:text-secondary')}
+            >
+              <History size={15} />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Board / List */}
-      {view === 'board' ? (
+      {/* Board / List / Activity */}
+      {view === 'board' && (
         <BoardView
           columns={columns}
           initialTasks={tasks}
@@ -139,7 +145,8 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           profileMap={profileMap}
           projectRole={projectRole}
         />
-      ) : (
+      )}
+      {view === 'list' && (
         <ListView
           initialTasks={tasks}
           columns={columns}
@@ -147,6 +154,9 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           userProfile={userProfile}
           projectRole={projectRole}
         />
+      )}
+      {view === 'activity' && canViewAuditTrail(projectRole) && (
+        <ProjectAuditTrail projectId={params.id} />
       )}
 
       {shareOpen && project && userId && (

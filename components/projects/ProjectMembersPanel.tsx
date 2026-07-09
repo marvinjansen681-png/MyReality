@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils/cn'
 import { canModifyMemberRow } from '@/lib/permissions/projectPermissions'
+import { fetchProfilesByIds } from '@/lib/utils/profiles'
 import EmptyState from '@/components/shared/EmptyState'
 import type { ProjectMember, ProjectRole, Profile } from '@/types'
 
@@ -41,11 +42,14 @@ export default function ProjectMembersPanel({ projectId, currentUserId, currentR
     const supabase = createClient()
     const { data } = await supabase
       .from('project_members')
-      .select('*, profile:profiles!project_members_user_id_fkey(id, full_name, email, avatar_url, created_at, updated_at)')
+      .select('*')
       .eq('project_id', projectId)
       .eq('status', 'active')
       .order('added_at', { ascending: true })
-    setMembers((data ?? []) as unknown as MemberWithProfile[])
+
+    const rows = (data ?? []) as ProjectMember[]
+    const profileMap = await fetchProfilesByIds(supabase, rows.map(r => r.user_id))
+    setMembers(rows.map(r => ({ ...r, profile: profileMap[r.user_id] ?? null })))
     setLoading(false)
   }, [projectId])
 

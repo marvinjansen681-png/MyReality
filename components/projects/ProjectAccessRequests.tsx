@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { Loader2, Check, X, Inbox } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { fetchProfilesByIds } from '@/lib/utils/profiles'
 import EmptyState from '@/components/shared/EmptyState'
 import type { ProjectAccessRequest, Profile } from '@/types'
 
@@ -26,11 +27,14 @@ export default function ProjectAccessRequests({ projectId, currentUserId, onChan
     const supabase = createClient()
     const { data } = await supabase
       .from('project_access_requests')
-      .select('*, profile:profiles!project_access_requests_user_id_fkey(id, full_name, email, avatar_url, created_at, updated_at)')
+      .select('*')
       .eq('project_id', projectId)
       .eq('status', 'pending')
       .order('requested_at', { ascending: true })
-    setRequests((data ?? []) as unknown as RequestWithProfile[])
+
+    const rows = (data ?? []) as ProjectAccessRequest[]
+    const profileMap = await fetchProfilesByIds(supabase, rows.map(r => r.user_id))
+    setRequests(rows.map(r => ({ ...r, profile: profileMap[r.user_id] ?? null })))
     setLoading(false)
   }, [projectId])
 
