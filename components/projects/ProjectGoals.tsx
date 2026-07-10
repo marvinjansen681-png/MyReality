@@ -3,19 +3,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format, parseISO } from 'date-fns'
-import { Target, Plus, Loader2, ChevronDown, Archive, RotateCcw, CheckCircle2, Circle, X as XIcon, Send } from 'lucide-react'
+import { Target, Plus, Loader2, ChevronDown, Archive, RotateCcw, CheckCircle2, Circle, X as XIcon, Send, UserPlus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils/cn'
 import { fetchProfilesByIds } from '@/lib/utils/profiles'
 import { parseMentions } from '@/lib/utils/mentions'
-import { canCreateGoal, canEditGoal, canCompleteGoal, canArchiveGoal, canCommentOnGoal } from '@/lib/permissions/projectPermissions'
+import { canCreateGoal, canEditGoal, canCompleteGoal, canArchiveGoal, canCommentOnGoal, canCreateGoalActionStep } from '@/lib/permissions/projectPermissions'
 import EmptyState from '@/components/shared/EmptyState'
 import PriorityBadge from '@/components/shared/PriorityBadge'
 import TaskDetail from './TaskDetail'
-import type { ProjectGoal, ProjectGoalPriority, ProjectGoalComment, Task, TaskPriority, Profile, ProjectRole } from '@/types'
+import type { ProjectGoal, ProjectGoalPriority, ProjectGoalComment, Task, TaskPriority, Profile, ProjectRole, Column } from '@/types'
 
 const PRIORITIES: ProjectGoalPriority[] = ['low', 'medium', 'high', 'urgent']
+const TASK_PRIORITIES: TaskPriority[] = ['none', 'low', 'medium', 'high', 'urgent']
 
 interface ProjectGoalsProps {
   projectId: string
@@ -23,11 +24,15 @@ interface ProjectGoalsProps {
   userProfile: Profile | null
   projectRole: ProjectRole | null
   tasks: Task[]
+  columns: Column[]
   profileMap: Record<string, Profile>
+  assigneesMap: Record<string, string[]>
+  activeMemberIds: Set<string>
   onTaskUpdated: (task: Task) => void
+  onTaskCreated: (task: Task) => void
 }
 
-export default function ProjectGoals({ projectId, userId, userProfile, projectRole, tasks, profileMap, onTaskUpdated }: ProjectGoalsProps) {
+export default function ProjectGoals({ projectId, userId, userProfile, projectRole, tasks, columns, profileMap, assigneesMap, activeMemberIds, onTaskUpdated, onTaskCreated }: ProjectGoalsProps) {
   const [goals, setGoals] = useState<ProjectGoal[]>([])
   const [loading, setLoading] = useState(true)
   const [showArchived, setShowArchived] = useState(false)
@@ -164,16 +169,22 @@ export default function ProjectGoals({ projectId, userId, userProfile, projectRo
 
                 {expanded && (
                   <GoalDetails
+                    projectId={projectId}
                     goal={goal}
                     goalTasks={goalTasks}
+                    columns={columns}
                     profileMap={profileMap}
+                    assigneesMap={assigneesMap}
+                    activeMemberIds={activeMemberIds}
                     userId={userId}
                     canEdit={canEdit}
                     canArchive={canArchive}
                     canComment={canCommentOnGoal(projectRole)}
+                    canCreateActionStep={canCreateGoalActionStep(projectRole)}
                     onEdit={() => setEditingGoal(goal)}
                     onArchiveToggle={() => toggleArchive(goal)}
                     onSelectTask={t => setActiveTask(t)}
+                    onTaskCreated={onTaskCreated}
                   />
                 )}
               </div>
@@ -211,19 +222,28 @@ export default function ProjectGoals({ projectId, userId, userProfile, projectRo
 }
 
 interface GoalDetailsProps {
+  projectId: string
   goal: ProjectGoal
   goalTasks: Task[]
+  columns: Column[]
   profileMap: Record<string, Profile>
+  assigneesMap: Record<string, string[]>
+  activeMemberIds: Set<string>
   userId: string
   canEdit: boolean
   canArchive: boolean
   canComment: boolean
+  canCreateActionStep: boolean
   onEdit: () => void
   onArchiveToggle: () => void
   onSelectTask: (task: Task) => void
+  onTaskCreated: (task: Task) => void
 }
 
-function GoalDetails({ goal, goalTasks, profileMap, userId, canEdit, canArchive, canComment, onEdit, onArchiveToggle, onSelectTask }: GoalDetailsProps) {
+function GoalDetails({
+  projectId, goal, goalTasks, columns, profileMap, assigneesMap, activeMemberIds, userId,
+  canEdit, canArchive, canComment, canCreateActionStep, onEdit, onArchiveToggle, onSelectTask, onTaskCreated,
+}: GoalDetailsProps) {
   const [comments, setComments] = useState<ProjectGoalComment[]>([])
   const [peopleMap, setPeopleMap] = useState<Record<string, Profile>>({})
   const [commentText, setCommentText] = useState('')
@@ -283,22 +303,37 @@ function GoalDetails({ goal, goalTasks, profileMap, userId, canEdit, canArchive,
       </div>
 
       <div>
-        <p className="text-xs text-muted mb-1.5">Tasks under this goal</p>
+        <p className="text-xs text-muted mb-1.5">Action Steps</p>
         {goalTasks.length === 0 ? (
-          <p className="text-xs text-muted">No tasks linked yet.</p>
+          <p className="text-xs text-muted mb-2">No action steps yet.</p>
         ) : (
-          <div className="space-y-1">
-            {goalTasks.map(t => (
-              <button
-                key={t.id}
-                onClick={() => onSelectTask(t)}
-                className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-md hover:bg-hover transition-colors"
-              >
-                {t.status === 'done' ? <CheckCircle2 size={13} className="text-green flex-shrink-0" /> : <Circle size={13} className="text-muted flex-shrink-0" />}
-                <span className={cn('text-xs truncate', t.status === 'done' ? 'line-through text-muted' : 'text-secondary')}>{t.title}</span>
-              </button>
-            ))}
+          <div className="space-y-1 mb-2">
+            {goalTasks.map(t => {
+              const assignees = assigneesMap[t.id] ?? []
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => onSelectTask(t)}
+                  className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-md hover:bg-hover transition-colors"
+                >
+                  {t.status === 'done' ? <CheckCircle2 size={13} className="text-green flex-shrink-0" /> : <Circle size={13} className="text-muted flex-shrink-0" />}
+                  <span className={cn('text-xs flex-1 truncate', t.status === 'done' ? 'line-through text-muted' : 'text-secondary')}>{t.title}</span>
+                  {t.due_date && <span className="text-[10px] text-muted flex-shrink-0">{format(parseISO(t.due_date), 'MMM d')}</span>}
+                  {assignees.length === 0 && <span className="text-[10px] text-muted flex-shrink-0">Unassigned</span>}
+                </button>
+              )
+            })}
           </div>
+        )}
+        {canCreateActionStep && (
+          <ActionStepQuickAdd
+            projectId={projectId}
+            goalId={goal.id}
+            columns={columns}
+            profileMap={profileMap}
+            activeMemberIds={activeMemberIds}
+            onCreated={onTaskCreated}
+          />
         )}
       </div>
 
@@ -343,6 +378,100 @@ function GoalDetails({ goal, goalTasks, profileMap, userId, canEdit, canArchive,
           <p className="text-xs text-muted">You don&apos;t have permission to comment on this goal.</p>
         )}
       </div>
+    </div>
+  )
+}
+
+interface ActionStepQuickAddProps {
+  projectId: string
+  goalId: string
+  columns: Column[]
+  profileMap: Record<string, Profile>
+  activeMemberIds: Set<string>
+  onCreated: (task: Task) => void
+}
+
+// Inline quick-add for a goal's Action Steps. Deliberately a single row of
+// fields (title, assignee, due date, priority) rather than a modal — the
+// whole point is "create and assign in one motion" per the brief's example
+// (Marvin creating "Upload fire certificate" and assigning it to Shafica
+// before saving). Goes through the create_goal_action_step RPC so the task
+// and its assignment are created atomically — see migration 030.
+function ActionStepQuickAdd({ projectId, goalId, columns, profileMap, activeMemberIds, onCreated }: ActionStepQuickAddProps) {
+  const [title, setTitle] = useState('')
+  const [assigneeId, setAssigneeId] = useState('')
+  const [dueDate, setDueDate] = useState('')
+  const [priority, setPriority] = useState<TaskPriority>('none')
+  const [saving, setSaving] = useState(false)
+
+  const defaultColumn = columns.find(c => c.title.toLowerCase() === 'todo') ?? columns[0]
+  const memberIds = Array.from(activeMemberIds)
+
+  async function handleAdd() {
+    const trimmed = title.trim()
+    if (!trimmed) return
+    if (!defaultColumn) { toast.error('This project has no columns to add the action step to'); return }
+    setSaving(true)
+    const supabase = createClient()
+    const { data, error } = await supabase.rpc('create_goal_action_step', {
+      project_id_input: projectId,
+      goal_id_input: goalId,
+      column_id_input: defaultColumn.id,
+      title_input: trimmed,
+      assignee_id_input: assigneeId || null,
+      due_date_input: dueDate || null,
+      priority_input: priority,
+    })
+    setSaving(false)
+    if (error) { toast.error('Failed to create action step', { description: error.message }); return }
+    onCreated(data as Task)
+    setTitle('')
+    setAssigneeId('')
+    setDueDate('')
+    setPriority('none')
+    toast.success('Action step added')
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 bg-hover/50 border border-[var(--border)] rounded-md p-2">
+      <input
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+        placeholder="New action step..."
+        className="flex-1 min-w-[140px] bg-card border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-[var(--border-focus)] transition-colors"
+      />
+      <select
+        value={assigneeId}
+        onChange={e => setAssigneeId(e.target.value)}
+        className="bg-card border border-[var(--border)] rounded-md px-2 py-1.5 text-xs text-primary focus:outline-none focus:border-[var(--border-focus)] transition-colors max-w-[130px]"
+      >
+        <option value="">Unassigned</option>
+        {memberIds.map(uid => (
+          <option key={uid} value={uid}>{profileMap[uid]?.full_name ?? profileMap[uid]?.email ?? uid.slice(0, 8)}</option>
+        ))}
+      </select>
+      <input
+        type="date"
+        value={dueDate}
+        onChange={e => setDueDate(e.target.value)}
+        className="bg-card border border-[var(--border)] rounded-md px-2 py-1.5 text-xs text-primary focus:outline-none focus:border-[var(--border-focus)] transition-colors"
+      />
+      <select
+        value={priority}
+        onChange={e => setPriority(e.target.value as TaskPriority)}
+        className="bg-card border border-[var(--border)] rounded-md px-2 py-1.5 text-xs text-primary focus:outline-none focus:border-[var(--border-focus)] transition-colors"
+      >
+        {TASK_PRIORITIES.map(p => <option key={p} value={p}>{p === 'none' ? 'No priority' : p[0].toUpperCase() + p.slice(1)}</option>)}
+      </select>
+      <button
+        onClick={handleAdd}
+        disabled={!title.trim() || saving}
+        className="flex items-center gap-1 px-2.5 py-1.5 bg-gold text-black text-xs font-semibold rounded-md hover:bg-gold-light transition-colors disabled:opacity-40"
+      >
+        {saving ? <Loader2 size={12} className="animate-spin" /> : <UserPlus size={12} />}
+        Add
+      </button>
     </div>
   )
 }

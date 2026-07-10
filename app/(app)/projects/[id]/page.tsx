@@ -13,7 +13,7 @@ import ProjectShareModal from '@/components/projects/ProjectShareModal'
 import ProjectAuditTrail from '@/components/projects/ProjectAuditTrail'
 import ProjectGoals from '@/components/projects/ProjectGoals'
 import ProjectOverview from '@/components/projects/ProjectOverview'
-import type { Project, Column, Task, Profile, ProjectRole, ProjectGoal } from '@/types'
+import type { Project, Column, Task, Profile, ProjectRole, ProjectGoal, DeadlineExplanation } from '@/types'
 
 export default function ProjectPage({ params }: { params: { id: string } }) {
   const [project, setProject] = useState<Project | null>(null)
@@ -29,6 +29,8 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const [notFound, setNotFound] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [assigneesMap, setAssigneesMap] = useState<Record<string, string[]>>({})
+  const [activeMemberIds, setActiveMemberIds] = useState<Set<string>>(new Set())
+  const [deadlineExplanations, setDeadlineExplanations] = useState<DeadlineExplanation[]>([])
   const [myTasksOnly, setMyTasksOnly] = useState(false)
   const router = useRouter()
 
@@ -39,7 +41,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       if (!user) return
       setUserId(user.id)
 
-      const [profileRes, memberRes, projectRes, columnsRes, tasksRes, roleRes, assigneesRes, goalsRes] = await Promise.all([
+      const [profileRes, memberRes, projectRes, columnsRes, tasksRes, roleRes, assigneesRes, goalsRes, activeMembersRes, deadlineExplanationsRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('workspace_members').select('workspace_id').eq('user_id', user.id).single(),
         supabase.from('projects').select('*').eq('id', params.id).single(),
@@ -48,6 +50,8 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
         supabase.from('project_members').select('role').eq('project_id', params.id).eq('user_id', user.id).eq('status', 'active').maybeSingle(),
         supabase.from('task_assignees').select('task_id, user_id').eq('project_id', params.id),
         supabase.from('project_goals').select('*').eq('project_id', params.id).order('sort_order').order('created_at'),
+        supabase.from('project_members').select('user_id').eq('project_id', params.id).eq('status', 'active'),
+        supabase.from('deadline_explanations').select('*').eq('project_id', params.id).order('created_at', { ascending: false }),
       ])
 
       if (roleRes.data) setProjectRole(roleRes.data.role as ProjectRole)
@@ -68,6 +72,8 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       setColumns((columnsRes.data ?? []) as Column[])
       setTasks((tasksRes.data ?? []) as Task[])
       setGoals((goalsRes.data ?? []) as ProjectGoal[])
+      setActiveMemberIds(new Set(((activeMembersRes.data ?? []) as { user_id: string }[]).map(m => m.user_id)))
+      setDeadlineExplanations((deadlineExplanationsRes.data ?? []) as DeadlineExplanation[])
 
       const map: Record<string, string[]> = {}
       for (const row of (assigneesRes.data ?? []) as { task_id: string; user_id: string }[]) {
@@ -147,6 +153,52 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
         (payload) => {
           const id = (payload.old as { id: string }).id
           setTasks(prev => prev.filter(t => t.id !== id))
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [params.id])
+
+  // Realtime: keep the page-level goals list (used by Project Pulse) in sync
+  // with goal edits/completions made from the Goals tab, which keeps its own
+  // separate local copy and doesn't write back up to this state otherwise.
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`project:${params.id}:goals:overview`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'project_goals', filter: `project_id=eq.${params.id}` },
+        (payload) => {
+          const goal = payload.new as ProjectGoal
+          setGoals(prev => prev.some(g => g.id === goal.id) ? prev : [...prev, goal])
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'project_goals', filter: `project_id=eq.${params.id}` },
+        (payload) => {
+          const goal = payload.new as ProjectGoal
+          setGoals(prev => prev.map(g => g.id === goal.id ? goal : g))
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [params.id])
+
+  // Realtime: deadline explanations appear on Project Pulse without a refresh.
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`project:${params.id}:deadline_explanations`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'deadline_explanations', filter: `project_id=eq.${params.id}` },
+        (payload) => {
+          const row = payload.new as DeadlineExplanation
+          setDeadlineExplanations(prev => prev.some(e => e.id === row.id) ? prev : [row, ...prev])
         }
       )
       .subscribe()
@@ -253,7 +305,17 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 
       {/* Overview / Board / List / Goals / Activity */}
       {view === 'overview' && (
-        <ProjectOverview tasks={tasks} goals={goals} assigneesMap={assigneesMap} userId={userId ?? ''} />
+        <ProjectOverview
+          projectId={params.id}
+          tasks={tasks}
+          goals={goals}
+          assigneesMap={assigneesMap}
+          profileMap={profileMap}
+          userId={userId ?? ''}
+          projectRole={projectRole}
+          deadlineExplanations={deadlineExplanations}
+          onExplanationAdded={row => setDeadlineExplanations(prev => prev.some(e => e.id === row.id) ? prev : [row, ...prev])}
+        />
       )}
       {view === 'board' && (
         <BoardView
@@ -289,8 +351,12 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           userProfile={userProfile}
           projectRole={projectRole}
           tasks={tasks}
+          columns={columns}
           profileMap={profileMap}
+          assigneesMap={assigneesMap}
+          activeMemberIds={activeMemberIds}
           onTaskUpdated={updated => setTasks(prev => prev.map(t => t.id === updated.id ? updated : t))}
+          onTaskCreated={created => setTasks(prev => prev.some(t => t.id === created.id) ? prev : [...prev, created])}
         />
       )}
       {view === 'activity' && canViewAuditTrail(projectRole) && (

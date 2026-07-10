@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { X, Calendar, Flag, Tag, Plus, Loader2, Send, Activity, Users, Target } from 'lucide-react'
+import { X, Calendar, Flag, Tag, Plus, Loader2, Send, Activity, Users, Target, ArrowUpRight } from 'lucide-react'
 import { format, parseISO, formatDistanceToNow } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils/cn'
 import { logActivity } from '@/lib/utils/activity'
 import { fetchProfilesByIds } from '@/lib/utils/profiles'
 import { parseMentions } from '@/lib/utils/mentions'
-import { canEditTaskMetadata, canAssignTask, canCommentOnProject } from '@/lib/permissions/projectPermissions'
+import { canEditTaskMetadata, canAssignTask, canCommentOnProject, canConvertTaskToGoal } from '@/lib/permissions/projectPermissions'
 import SubtaskList from '@/components/tasks/SubtaskList'
 import PriorityBadge from '@/components/shared/PriorityBadge'
 import TaskAssigneesPanel from '@/components/projects/TaskAssigneesPanel'
@@ -50,6 +50,8 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
   const [commentText, setCommentText] = useState('')
   const [sendingComment, setSendingComment] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [convertOpen, setConvertOpen] = useState(false)
+  const [converting, setConverting] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const labelInputRef = useRef<HTMLInputElement>(null)
   const commentsEndRef = useRef<HTMLDivElement>(null)
@@ -57,6 +59,7 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
   const canEditMeta = canEditTaskMetadata(projectRole)
   const canAssign = canAssignTask(projectRole)
   const canComment = canCommentOnProject(projectRole)
+  const canConvert = canConvertTaskToGoal(projectRole)
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -175,6 +178,21 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
     setAssigneeIds(prev => prev.filter(id => id !== assigneeId))
   }
 
+  async function handleConvertToGoal() {
+    if (!task) return
+    setConverting(true)
+    const supabase = createClient()
+    const { data, error } = await supabase.rpc('convert_task_to_goal', { task_id_input: task.id })
+    setConverting(false)
+    setConvertOpen(false)
+    if (error) { toast.error('Failed to convert task to goal', { description: error.message }); return }
+    const newGoal = data as { id: string; title: string }
+    setGoalId(newGoal.id)
+    setGoals(prev => prev.some(g => g.id === newGoal.id) ? prev : [...prev, newGoal as ProjectGoal])
+    onUpdated({ ...task, goal_id: newGoal.id })
+    toast.success(`Goal "${newGoal.title}" created`, { description: 'You can now move related tasks under this goal.' })
+  }
+
   async function sendComment() {
     if (!commentText.trim() || !task || !canComment) return
     setSendingComment(true)
@@ -226,6 +244,7 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
   }
 
   return (
+    <>
     <AnimatePresence>
       {task && (
         <>
@@ -302,15 +321,26 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
                 {task.project_id && (
                   <div>
                     <label className="text-xs text-muted mb-1.5 flex items-center gap-1 block"><Target size={11} /> Goal</label>
-                    <select
-                      value={goalId}
-                      disabled={!canEditMeta}
-                      onChange={e => { const g = e.target.value; setGoalId(g); saveField({ goal_id: g || null }) }}
-                      className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-md px-2.5 py-2 text-xs text-primary focus:outline-none focus:border-[var(--border-focus)] disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <option value="">No goal</option>
-                      {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={goalId}
+                        disabled={!canEditMeta}
+                        onChange={e => { const g = e.target.value; setGoalId(g); saveField({ goal_id: g || null }) }}
+                        className="flex-1 bg-[var(--bg-surface)] border border-[var(--border)] rounded-md px-2.5 py-2 text-xs text-primary focus:outline-none focus:border-[var(--border-focus)] disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="">No goal</option>
+                        {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
+                      </select>
+                      {canConvert && (
+                        <button
+                          onClick={() => setConvertOpen(true)}
+                          title="Turn this task into its own goal"
+                          className="flex-shrink-0 flex items-center gap-1 px-2.5 py-2 text-xs text-gold hover:bg-[var(--gold-muted)] rounded-md transition-colors whitespace-nowrap"
+                        >
+                          <ArrowUpRight size={12} /> Convert to Goal
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -365,10 +395,19 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
                   </div>
                 </div>
 
-                {/* Subtasks */}
+                {/* Subtasks — personal tasks only. Project tasks use Goal Action
+                    Steps instead: a personal subtask (is_personal=true, no
+                    project_id/goal_id/assignee) would be invisible to the rest
+                    of the team, which defeats the point of project tracking. */}
                 <div>
                   <label className="text-xs text-muted mb-2 block">Subtasks</label>
-                  <SubtaskList parentId={task.id} subtasks={subtasks} onSubtasksChange={setSubtasks} userId={userId} />
+                  {task.project_id ? (
+                    <p className="text-xs text-muted bg-hover/50 border border-[var(--border)] rounded-md px-3 py-2.5">
+                      Use Goal Action Steps for assignable project work.
+                    </p>
+                  ) : (
+                    <SubtaskList parentId={task.id} subtasks={subtasks} onSubtasksChange={setSubtasks} userId={userId} />
+                  )}
                 </div>
 
                 {/* Comments */}
@@ -447,5 +486,40 @@ export default function TaskDetail({ task, userId, userProfile, projectRole = nu
         </>
       )}
     </AnimatePresence>
+
+    {/* Convert to Goal confirmation — plain conditional rendering, no
+        AnimatePresence exit dependency (the same fix applied to the New
+        Project modal in Step 21F after AnimatePresence was found to leave
+        an invisible, click-blocking backdrop mounted after "closing"). Kept
+        as a sibling outside the AnimatePresence above rather than another
+        child inside it, to avoid any risk of the two conditional blocks
+        confusing AnimatePresence's own child tracking. */}
+    {convertOpen && task && (
+      <>
+        <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => !converting && setConvertOpen(false)} />
+        <div className="fixed inset-0 z-[61] flex items-center justify-center p-4">
+          <div className="bg-card border border-[var(--border)] rounded-xl w-full max-w-sm p-5">
+            <h3 className="font-display text-lg font-bold text-primary mb-2">Convert to Goal?</h3>
+            <p className="text-sm text-secondary mb-4">
+              This creates a new goal called &quot;{task.title}&quot; and links this task under it as its first action step. The task itself is not deleted.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConvertOpen(false)} disabled={converting} className="flex-1 py-2.5 rounded-md border border-[var(--border)] text-sm text-secondary hover:bg-hover transition-colors disabled:opacity-40">
+                Cancel
+              </button>
+              <button
+                onClick={handleConvertToGoal}
+                disabled={converting}
+                className="flex-1 py-2.5 rounded-md bg-gold text-black text-sm font-semibold hover:bg-gold-light transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {converting && <Loader2 size={14} className="animate-spin" />}
+                Convert
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    )}
+    </>
   )
 }

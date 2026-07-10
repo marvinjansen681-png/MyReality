@@ -21,6 +21,7 @@ const FILTERS: { key: AuditCategory | 'all'; label: string }[] = [
   { key: 'invites', label: 'Invites' },
   { key: 'requests', label: 'Access requests' },
   { key: 'goals', label: 'Goals' },
+  { key: 'deadlines', label: 'Deadlines' },
   { key: 'project', label: 'Project changes' },
 ]
 

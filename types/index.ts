@@ -132,6 +132,19 @@ export interface ProjectGoalComment {
   profile?: Profile
 }
 
+export interface DeadlineExplanation {
+  id: string
+  project_id: string
+  task_id: string | null
+  goal_id: string | null
+  due_date: string
+  reason: string
+  new_expected_date: string | null
+  created_by: string | null
+  created_at: string
+  profile?: Profile
+}
+
 export interface TaskAssignee {
   id: string
   task_id: string

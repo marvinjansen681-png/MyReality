@@ -1,6 +1,6 @@
 import type { AuditEvent, TaskStatus, TaskPriority, ProjectRole } from '@/types'
 
-export type AuditCategory = 'project' | 'tasks' | 'members' | 'invites' | 'requests' | 'goals' | 'other'
+export type AuditCategory = 'project' | 'tasks' | 'members' | 'invites' | 'requests' | 'goals' | 'deadlines' | 'other'
 
 export interface FormattedAuditEvent {
   title: string
@@ -48,6 +48,9 @@ export function collectAuditEventTaskIds(event: AuditEvent): string[] {
   if (event.entity_type === 'tasks') {
     ids.push(readString(event.new_data as Record<string, unknown> | null, 'id'), readString(event.old_data as Record<string, unknown> | null, 'id'))
   }
+  if (event.entity_type === 'deadline_explanations') {
+    ids.push(readString(event.new_data as Record<string, unknown> | null, 'task_id'))
+  }
   return ids.filter((id): id is string => !!id)
 }
 
@@ -66,6 +69,9 @@ export function collectAuditEventGoalIds(event: AuditEvent): string[] {
   }
   if (event.entity_type === 'tasks') {
     ids.push(readString(newData, 'goal_id'), readString(oldData, 'goal_id'))
+  }
+  if (event.entity_type === 'deadline_explanations') {
+    ids.push(readString(newData, 'goal_id'))
   }
   return ids.filter((id): id is string => !!id)
 }
@@ -108,6 +114,8 @@ export function formatAuditEvent(
       return formatProjectGoalEvent(event, actor, oldData, newData)
     case 'project_goal_comments':
       return formatGoalCommentEvent(event, actor, getGoalTitle, newData)
+    case 'deadline_explanations':
+      return formatDeadlineExplanationEvent(event, actor, getTaskTitle, getGoalTitle, newData)
     default:
       return { title: `${actor} performed ${event.action.toLowerCase()} on ${event.entity_type}`, detail: null, category: 'other' }
   }
@@ -158,8 +166,16 @@ function formatTaskEvent(
 ): FormattedAuditEvent {
   const title = readString(newData, 'title') ?? readString(oldData, 'title') ?? 'a task'
 
-  if (event.action === 'INSERT') return { title: `${actor} created task "${title}"`, detail: null, category: 'tasks' }
+  if (event.action === 'INSERT') {
+    const goalId = readString(newData, 'goal_id')
+    if (goalId) return { title: `${actor} created action step "${title}" under goal "${getGoalTitle(goalId)}"`, detail: null, category: 'goals' }
+    return { title: `${actor} created task "${title}"`, detail: null, category: 'tasks' }
+  }
   if (event.action === 'DELETE') return { title: `${actor} deleted task "${title}"`, detail: null, category: 'tasks' }
+  if (event.action === 'CONVERT_TO_GOAL') {
+    const goalTitle = readString(newData, 'goal_title')
+    return { title: `${actor} converted task "${title}" into goal "${goalTitle ?? title}"`, detail: null, category: 'goals' }
+  }
 
   if (event.action === 'UPDATE' && oldData && newData) {
     const oldGoalId = readString(oldData, 'goal_id')
@@ -302,6 +318,20 @@ function formatGoalCommentEvent(event: AuditEvent, actor: string, getGoalTitle: 
   }
   if (event.action === 'DELETE') return { title: `${actor} deleted a comment on goal "${goalTitle}"`, detail: null, category: 'goals' }
   return { title: `${actor} edited a comment on goal "${goalTitle}"`, detail: null, category: 'goals' }
+}
+
+function formatDeadlineExplanationEvent(
+  event: AuditEvent, actor: string, getTaskTitle: NameResolver, getGoalTitle: NameResolver, newData: Record<string, unknown> | null
+): FormattedAuditEvent {
+  const taskId = readString(newData, 'task_id')
+  const goalId = readString(newData, 'goal_id')
+  const target = taskId ? `"${getTaskTitle(taskId)}"` : `"${getGoalTitle(goalId)}"`
+  const newExpected = readString(newData, 'new_expected_date')
+  return {
+    title: `${actor} explained a missed deadline for ${target}`,
+    detail: newExpected ? `New expected date: ${newExpected}` : null,
+    category: 'deadlines',
+  }
 }
 
 function formatAccessRequestEvent(

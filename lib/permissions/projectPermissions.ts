@@ -89,3 +89,24 @@ export function canArchiveGoal(role: ProjectRole | null): boolean {
 export function canCommentOnGoal(role: ProjectRole | null): boolean {
   return canCommentOnProject(role)
 }
+
+// Action steps are real project tasks — creating one requires the same
+// level as any other content edit (owner/manager/editor), matching the
+// create_goal_action_step RPC's own can_edit_project_content() check.
+export function canCreateGoalActionStep(role: ProjectRole | null): boolean {
+  return canEditProjectContent(role)
+}
+
+// Explaining a missed deadline is a form of commenting on project status —
+// same tier as task/goal comments (owner/manager/editor/commenter), matching
+// the deadline_explanations RLS INSERT policy.
+export function canExplainMissedDeadline(role: ProjectRole | null): boolean {
+  return canCommentOnProject(role)
+}
+
+// Converting a task into a goal is a structural content edit, same tier as
+// creating/editing a goal — matching convert_task_to_goal's own
+// can_edit_project_content() check.
+export function canConvertTaskToGoal(role: ProjectRole | null): boolean {
+  return canEditProjectContent(role)
+}
