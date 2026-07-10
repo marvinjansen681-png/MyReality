@@ -110,3 +110,18 @@ export function canExplainMissedDeadline(role: ProjectRole | null): boolean {
 export function canConvertTaskToGoal(role: ProjectRole | null): boolean {
   return canEditProjectContent(role)
 }
+
+// Project chat — sending is the same tier as commenting (owner/manager/
+// editor/commenter); viewer can read but not send, matching the
+// project_chat_messages RLS INSERT policy exactly.
+export function canSendProjectChatMessage(role: ProjectRole | null): boolean {
+  return canCommentOnProject(role)
+}
+
+// Deleting someone else's chat message (moderation) is owner/manager only,
+// matching the enforce_chat_message_edit_rules DB trigger. A sender can
+// always delete their own message regardless of role — that's not gated by
+// this helper, just an id comparison in the UI/DB.
+export function canDeleteAnyProjectChatMessage(role: ProjectRole | null): boolean {
+  return canManageProject(role)
+}

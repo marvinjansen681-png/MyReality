@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, LayoutGrid, List, ArrowLeft, Share2, History, User, Target, LayoutDashboard } from 'lucide-react'
+import { Loader2, LayoutGrid, List, ArrowLeft, Share2, History, User, Target, LayoutDashboard, MessageSquare } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import { canManageInvites, canViewAuditTrail } from '@/lib/permissions/projectPermissions'
@@ -13,6 +13,7 @@ import ProjectShareModal from '@/components/projects/ProjectShareModal'
 import ProjectAuditTrail from '@/components/projects/ProjectAuditTrail'
 import ProjectGoals from '@/components/projects/ProjectGoals'
 import ProjectOverview from '@/components/projects/ProjectOverview'
+import ProjectChat from '@/components/projects/ProjectChat'
 import type { Project, Column, Task, Profile, ProjectRole, ProjectGoal, DeadlineExplanation } from '@/types'
 
 export default function ProjectPage({ params }: { params: { id: string } }) {
@@ -24,7 +25,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const [profileMap, setProfileMap] = useState<Record<string, Profile>>({})
   const [projectRole, setProjectRole] = useState<ProjectRole | null>(null)
   const [goals, setGoals] = useState<ProjectGoal[]>([])
-  const [view, setView] = useState<'overview' | 'board' | 'list' | 'goals' | 'activity'>('overview')
+  const [view, setView] = useState<'overview' | 'board' | 'list' | 'goals' | 'chat' | 'activity'>('overview')
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
@@ -293,6 +294,14 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
         >
           <Target size={14} /> Goals
         </button>
+        {projectRole !== null && (
+          <button
+            onClick={() => setView('chat')}
+            className={cn('flex items-center gap-1.5 flex-shrink-0 px-3 py-2 rounded-lg text-sm transition-colors', view === 'chat' ? 'bg-hover text-primary font-medium' : 'text-muted hover:text-secondary')}
+          >
+            <MessageSquare size={14} /> Chat
+          </button>
+        )}
         {canViewAuditTrail(projectRole) && (
           <button
             onClick={() => setView('activity')}
@@ -357,6 +366,16 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           activeMemberIds={activeMemberIds}
           onTaskUpdated={updated => setTasks(prev => prev.map(t => t.id === updated.id ? updated : t))}
           onTaskCreated={created => setTasks(prev => prev.some(t => t.id === created.id) ? prev : [...prev, created])}
+        />
+      )}
+      {view === 'chat' && userId && projectRole !== null && (
+        <ProjectChat
+          projectId={params.id}
+          userId={userId}
+          userProfile={userProfile}
+          projectRole={projectRole}
+          profileMap={profileMap}
+          activeMemberIds={activeMemberIds}
         />
       )}
       {view === 'activity' && canViewAuditTrail(projectRole) && (

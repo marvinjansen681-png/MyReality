@@ -1,6 +1,6 @@
 import type { AuditEvent, TaskStatus, TaskPriority, ProjectRole } from '@/types'
 
-export type AuditCategory = 'project' | 'tasks' | 'members' | 'invites' | 'requests' | 'goals' | 'deadlines' | 'other'
+export type AuditCategory = 'project' | 'tasks' | 'members' | 'invites' | 'requests' | 'goals' | 'deadlines' | 'chat' | 'other'
 
 export interface FormattedAuditEvent {
   title: string
@@ -116,6 +116,8 @@ export function formatAuditEvent(
       return formatGoalCommentEvent(event, actor, getGoalTitle, newData)
     case 'deadline_explanations':
       return formatDeadlineExplanationEvent(event, actor, getTaskTitle, getGoalTitle, newData)
+    case 'project_chat_messages':
+      return formatChatMessageEvent(event, actor, oldData, newData)
     default:
       return { title: `${actor} performed ${event.action.toLowerCase()} on ${event.entity_type}`, detail: null, category: 'other' }
   }
@@ -332,6 +334,18 @@ function formatDeadlineExplanationEvent(
     detail: newExpected ? `New expected date: ${newExpected}` : null,
     category: 'deadlines',
   }
+}
+
+function formatChatMessageEvent(
+  event: AuditEvent, actor: string, oldData: Record<string, unknown> | null, newData: Record<string, unknown> | null
+): FormattedAuditEvent {
+  const content = readString(newData, 'content') ?? readString(oldData, 'content')
+  const preview = content ? `"${truncate(content, 80)}"` : null
+
+  if (event.action === 'SEND') return { title: `${actor} sent a chat message`, detail: preview, category: 'chat' }
+  if (event.action === 'EDIT') return { title: `${actor} edited a chat message`, detail: preview, category: 'chat' }
+  if (event.action === 'DELETE_MESSAGE') return { title: `${actor} deleted a chat message`, detail: null, category: 'chat' }
+  return { title: `${actor} updated a chat message`, detail: null, category: 'chat' }
 }
 
 function formatAccessRequestEvent(

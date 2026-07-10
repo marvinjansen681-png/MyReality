@@ -132,6 +132,20 @@ export interface ProjectGoalComment {
   profile?: Profile
 }
 
+export interface ProjectChatMessage {
+  id: string
+  project_id: string
+  sender_id: string
+  content: string
+  reply_to_message_id: string | null
+  edited_at: string | null
+  deleted_at: string | null
+  deleted_by: string | null
+  created_at: string
+  updated_at: string
+  profile?: Profile
+}
+
 export interface DeadlineExplanation {
   id: string
   project_id: string
