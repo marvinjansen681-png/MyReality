@@ -30,6 +30,7 @@ const NOTIF_ICONS: Record<string, string> = {
   vision_due: '✨',
   access_request_approved: '✅',
   access_request_rejected: '⛔',
+  access_request_received: '📨',
 }
 
 interface HeaderProps {

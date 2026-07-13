@@ -33,6 +33,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const [activeMemberIds, setActiveMemberIds] = useState<Set<string>>(new Set())
   const [deadlineExplanations, setDeadlineExplanations] = useState<DeadlineExplanation[]>([])
   const [myTasksOnly, setMyTasksOnly] = useState(false)
+  const [pendingRequestCount, setPendingRequestCount] = useState(0)
   const router = useRouter()
 
   useEffect(() => {
@@ -207,6 +208,40 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
     return () => { supabase.removeChannel(channel) }
   }, [params.id])
 
+  // Pending access-request count for the Share button badge — without this,
+  // a real bug we hit: an owner/manager had no way to notice a request was
+  // waiting short of opening Share > Requests on the off chance. RLS
+  // already restricts project_access_requests visibility to owner/manager,
+  // so this query harmlessly returns 0 for anyone else.
+  async function loadPendingRequestCount() {
+    const supabase = createClient()
+    const { count } = await supabase
+      .from('project_access_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('project_id', params.id)
+      .eq('status', 'pending')
+    setPendingRequestCount(count ?? 0)
+  }
+
+  useEffect(() => {
+    loadPendingRequestCount()
+  }, [params.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime: new access requests bump the badge live without a refresh.
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`project:${params.id}:access_requests_badge`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'project_access_requests', filter: `project_id=eq.${params.id}` },
+        () => { loadPendingRequestCount() }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [params.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -247,10 +282,15 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
         {canManageInvites(projectRole) && (
           <button
             onClick={() => setShareOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-secondary hover:text-primary hover:bg-hover rounded-lg transition-colors flex-shrink-0 min-h-[40px]"
+            className="relative flex items-center gap-1.5 px-3 py-2 text-sm text-secondary hover:text-primary hover:bg-hover rounded-lg transition-colors flex-shrink-0 min-h-[40px]"
           >
             <Share2 size={15} />
             <span className="hidden sm:inline">Share</span>
+            {pendingRequestCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 bg-gold text-[#0a0a0a] text-[10px] font-bold rounded-full flex items-center justify-center">
+                {pendingRequestCount > 9 ? '9+' : pendingRequestCount}
+              </span>
+            )}
           </button>
         )}
         {/* My tasks toggle */}

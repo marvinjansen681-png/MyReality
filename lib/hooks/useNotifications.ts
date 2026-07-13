@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { playNotificationSound } from '@/lib/utils/notificationSound'
 import type { Notification } from '@/types'
 
 export function useNotifications(userId: string | null) {
@@ -41,6 +42,7 @@ export function useNotifications(userId: string | null) {
           const n = payload.new as Notification
           setNotifications(prev => [n, ...prev])
           setUnreadCount(c => c + 1)
+          playNotificationSound()
         }
       )
       .subscribe()
